@@ -1,0 +1,160 @@
+{
+	"Comment": "Minimal config for running locally",
+	"MaxParallelism": 50,
+	"MaxBatchParallelism": 5,
+	"MaxQueriesPerSecondPerIP": 50,
+	"MaxInflightPerIP": 50,
+	"Retry": {
+		"MaxRetries": 3,
+		"Backoff": "Values",
+		"BackoffValuesInMs": [0, 500, 2000 ],
+	},
+	"Input": {
+		"CSVColumnIndex": 0,
+		"CSVSeparator": ",",
+		"Offset": 0,
+	},
+	"Output": {
+		"FileSize": 200,
+		"Format": "protobuf",
+		"Zip": "zst:fast",
+		"Path": "data",
+		"ParallelFiles": 1
+	},
+	"RateLimitingTimeoutInSeconds": 600,
+	"UDP": {
+		"TimeoutInMs":2000,
+		"PoolSize": 10
+	},
+	"TCP": {
+		"EphemeralConns": 50,
+		"PoolSize": 50,
+	},
+	"EnableICMP": false,
+	"AllNameServerIPs": true,
+	"Loglevel": "info",
+	"Logfile": "scan.log",
+	"MaxCNAMEDepth": 64,
+	"GatherDNSSEC": true,
+	"QueryFor": {
+		"OnFullNameResolved": [
+			{
+				"Comment": "Query IPv4 addresses of domain",
+				"NameTemplate": "{name}",
+				"Type": 1,
+				"Class": 1,
+			},
+			{
+				"Comment": "Query IPv6 addresses of domain",
+				"NameTemplate": "{name}",
+				"Type": 28,
+				"Class": 1
+			},
+			{
+				"Comment": "Query TXT records of domain",
+				"NameTemplate": "{name}",
+				"Type": 16,
+				"Class": 1,
+			}
+		],
+		"OnZoneCreated": [
+			{
+				"Comment": "Query SOA records of zone",
+				"NameTemplate": "{zone}",
+				"Type": 6,
+				"Class": 1,
+			},
+			{
+				"Comment": "Query TXT records of zone",
+				"NameTemplate": "{name}",
+				"Type": 16,
+				"Class": 1,
+			},
+			{
+				"Comment": "Query MX records of zone",
+				"NameTemplate": "{zone}",
+				"Type": 15,
+				"Class": 1,
+				"DoNotFollow": true // Don't resolve mail server names
+			},
+			{
+				"Comment": "Query dmarc records of zone",
+				"NameTemplate": "_dmarc.{zone}",
+				"Type": 16,
+				"Class": 1,
+				"SkipRoot": true,
+				"SkipTLD": true,
+				"DoNotFollow": true, // Don't resolve _dmarc zones (in case they are a separate zone)
+			},
+			{
+				"Comment": "Query bind version records of name servers in zone",
+				"NameTemplate": "version.bind.",
+				"Type": 16,
+				"Class": 3,
+				// Many nameservers will terminate a TCP connection if they receive this query.
+				// This is interfering with the TCP connection pooling and reuse.
+				// Since there should be no truncation, TCP fallback is not necessary anyway.
+				"UDPOnly": true,
+
+				// Many nameservers will just not respond. No use in trying too often.
+				"MaxRetries": 1,
+				"DisableInfraCache": true
+			},
+			{
+				"Comment": "Query DNSKEY records of zone",
+				"NameTemplate": "{zone}",
+				"Type": 48,
+				"Class": 1,
+			},
+			{
+				"Comment": "Query DS records of zone.  We would expect this to be in the parent itself. But we still ask because it might be misconfigured.",
+				"NameTemplate": "{zone}",
+				"Type": 43,
+				"Class": 1,
+			},
+			{
+				"Comment": "Query CDNSKEY records of zone",
+				"NameTemplate": "{zone}",
+				"Type": 60,
+				"Class": 1,
+				"SkipRoot": true
+			},
+			{
+				"Comment": "Query CDS records of zone.",
+				"NameTemplate": "{zone}",
+				"Type": 59,
+				"Class": 1,
+				"SkipRoot": true
+			},
+			{
+				"Comment": "Query CSYNC records of zone.",
+				"NameTemplate": "{zone}",
+				"Type": 62,
+				"Class": 1,
+				"SkipRoot": true
+			},
+			{
+				"Comment": "Query CAA records of zone.",
+				"NameTemplate": "{zone}",
+				"Type": 257,
+				"Class": 1,
+				"SkipRoot": true,
+				"SkipTLD": true
+			},
+			{
+				"Comment": "Query DNSKEY records of zone. We would expect this to be in the zone itself. But we still ask because it might be misconfigured.",
+				"NameTemplate": "{zone}",
+				"Type": 48,
+				"Class": 1,
+				"AskParent": true
+			},
+			{
+				"Comment": "Query DS records of zone.",
+				"NameTemplate": "{zone}",
+				"Type": 43,
+				"Class": 1,
+				"AskParent": true
+			}
+		],
+	}
+}
