@@ -10,6 +10,7 @@ OUTPUT_EXCLUDED = "data_preprocess/excluded_candidates.csv"
 NUM_ROOTS = 100
 MAX_ACCEPTED_PER_ROOT = 100
 RANDOM_SEED = 67
+MAX_CANDIDATES_PER_ROOT = 300
 
 def load_root_domains(filepath: str):
     rows = []
@@ -66,7 +67,7 @@ def run_subfinder(domain: str):
         names.append(name)
 
     random.shuffle(names)
-    return names
+    return names[:MAX_CANDIDATES_PER_ROOT]
 
 def dig_name(name: str):
     """
