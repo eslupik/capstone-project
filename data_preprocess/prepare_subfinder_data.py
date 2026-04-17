@@ -7,8 +7,8 @@ INPUT_FILE = "data_preprocess/root_domain.csv"
 OUTPUT_ACCEPTED = "data_preprocess/subfinder_candidates.csv"
 OUTPUT_EXCLUDED = "data_preprocess/excluded_candidates.csv"
 
-NUM_ROOTS = 100
-MAX_ACCEPTED_PER_ROOT = 100
+NUM_ROOTS = 1000
+MAX_ACCEPTED_PER_ROOT = 20
 RANDOM_SEED = 67
 MAX_CANDIDATES_PER_ROOT = 300
 
