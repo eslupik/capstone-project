@@ -10,7 +10,7 @@ OUTPUT_EXCLUDED = "data_preprocess/excluded_candidates.csv"
 NUM_ROOTS = 1000
 MAX_ACCEPTED_PER_ROOT = 20
 RANDOM_SEED = 67
-MAX_CANDIDATES_PER_ROOT = 300
+MAX_CANDIDATES_PER_ROOT = 1000
 
 def load_root_domains(filepath: str):
     rows = []
