@@ -13,12 +13,12 @@
 		"BackoffValuesInMs": [0, 200, 500, 1000, 3000 ],
 	},
 	"Input": {
-		"Path": "/home/local/slupike/capstone-project/config/capstone_config/example_target_1.csv",
-		"CSVColumnIndex": 0,
+		"Path": "/home/local/slupike/capstone-project/config/capstone_config/subfinder_example_10.csv",
+		"CSVColumnIndex": 1,
 		"CSVSeparator": ",",
-		"Offset": 0,
+		"Offset": 1,
 		"BatchSize": 20,
-		"Len": 1,
+		"Len": 10,
 		"PSLPath": "/home/local/slupike/capstone-project/config/capstone_config/public_suffix_list.dat"
 	},
 	"Output": {
