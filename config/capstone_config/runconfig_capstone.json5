@@ -81,24 +81,12 @@
 				"Type": 28,
 				"Class": 1
 			},
-			{
-				"Comment": "Query TXT records of domain",
-				"NameTemplate": "{name}",
-				"Type": 16,
-				"Class": 1,
-			}
 		],
 		"OnZoneCreated": [
 			{
 				"Comment": "Query SOA records of zone",
 				"NameTemplate": "{zone}",
 				"Type": 6,
-				"Class": 1,
-			},
-			{
-				"Comment": "Query TXT records of zone",
-				"NameTemplate": "{name}",
-				"Type": 16,
 				"Class": 1,
 			},
 			{

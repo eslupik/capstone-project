@@ -1,0 +1,17 @@
+.,6,net.;gtld-servers.net.;nstld.com.;com.;.;root-servers.net.
+org.,15,org.;org.afilias-nst.org.;dig.afilias-nst.info.;info.afilias-nst.org.;afilias-nst.info.;net.;gtld-servers.net.;com.;org.afilias-nst.info.;info.afilias-nst.info.;.;nstld.com.;info.;afilias-nst.org.;root-servers.net.
+afilias-nst.org.,15,info.;root-servers.net.;gtld-servers.net.;org.afilias-nst.info.;nstld.com.;org.;org.afilias-nst.org.;afilias-nst.org.;dig.afilias-nst.info.;afilias-nst.info.;info.afilias-nst.org.;.;net.;com.;info.afilias-nst.info.
+org.afilias-nst.org.,15,org.afilias-nst.org.;info.afilias-nst.info.;info.afilias-nst.org.;org.;gtld-servers.net.;com.;afilias-nst.info.;dig.afilias-nst.info.;info.;afilias-nst.org.;.;root-servers.net.;org.afilias-nst.info.;net.;nstld.com.
+info.afilias-nst.org.,15,info.afilias-nst.org.;info.afilias-nst.info.;afilias-nst.info.;info.;root-servers.net.;com.;afilias-nst.org.;org.;org.afilias-nst.info.;gtld-servers.net.;nstld.com.;dig.afilias-nst.info.;.;net.;org.afilias-nst.org.
+example.org.,17,gtld-servers.net.;net.;org.;dig.afilias-nst.info.;info.afilias-nst.org.;cloudflare.com.;com.;org.afilias-nst.org.;afilias-nst.info.;info.afilias-nst.info.;afilias-nst.org.;.;info.;example.org.;nstld.com.;root-servers.net.;org.afilias-nst.info.
+net.,6,root-servers.net.;net.;gtld-servers.net.;nstld.com.;com.;.
+gtld-servers.net.,6,gtld-servers.net.;nstld.com.;com.;.;root-servers.net.;net.
+root-servers.net.,6,root-servers.net.;net.;gtld-servers.net.;nstld.com.;com.;.
+info.,15,afilias-nst.org.;.;gtld-servers.net.;info.;com.;afilias-nst.info.;org.afilias-nst.org.;root-servers.net.;net.;nstld.com.;info.afilias-nst.org.;dig.afilias-nst.info.;org.;org.afilias-nst.info.;info.afilias-nst.info.
+afilias-nst.info.,15,afilias-nst.info.;dig.afilias-nst.info.;info.afilias-nst.info.;root-servers.net.;gtld-servers.net.;nstld.com.;info.;org.;org.afilias-nst.info.;.;info.afilias-nst.org.;afilias-nst.org.;org.afilias-nst.org.;net.;com.
+dig.afilias-nst.info.,15,gtld-servers.net.;org.afilias-nst.info.;.;net.;org.;afilias-nst.org.;root-servers.net.;nstld.com.;com.;afilias-nst.info.;info.;info.afilias-nst.info.;info.afilias-nst.org.;org.afilias-nst.org.;dig.afilias-nst.info.
+info.afilias-nst.info.,15,gtld-servers.net.;com.;org.afilias-nst.org.;afilias-nst.info.;org.afilias-nst.info.;net.;afilias-nst.org.;.;root-servers.net.;org.;info.afilias-nst.info.;dig.afilias-nst.info.;info.;nstld.com.;info.afilias-nst.org.
+org.afilias-nst.info.,15,info.afilias-nst.org.;gtld-servers.net.;nstld.com.;org.afilias-nst.org.;afilias-nst.info.;info.afilias-nst.info.;afilias-nst.org.;dig.afilias-nst.info.;info.;net.;org.;org.afilias-nst.info.;root-servers.net.;com.;.
+com.,6,com.;gtld-servers.net.;nstld.com.;net.;.;root-servers.net.
+nstld.com.,6,nstld.com.;com.;gtld-servers.net.;net.;.;root-servers.net.
+cloudflare.com.,7,.;root-servers.net.;cloudflare.com.;com.;gtld-servers.net.;nstld.com.;net.
