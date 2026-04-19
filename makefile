@@ -21,8 +21,10 @@ capstone_test: build
 	cp -r ${configDir}/capstone_config/* ${outputDir}/capstone_test/config # copy config so we know which config was used for the run
 	# Run scan!
 	cd ${outputDir}/capstone_test; ${CURDIR}/yodns/yodns/yodns scan --config=${CURDIR}/${configDir}/capstone_config/runconfig_capstone.json5 --threads 30 --ipv4-only
+	# Validate the output [optional]
+	find ${outputDir}/capstone_test/data -type f -name 'output_*.zst' | parallel --jobs ${jobs} --plus ${CURDIR}/yodns/yodns/yodns validate --in={} --out=${outputDir}/capstone_test/validate/{/..}.json.zst --zip "zst" --printnoerr
 	# Convert to json format [optional]
-	find ${outputDir}/capstone_test/data -type f -name 'output_*.zst' | parallel --jobs ${jobs} --plus ${CURDIR}/yodns/yodns/yodns convertFormat --in={} --out=${outputDir}/capstone_test/json/{/..}.json
+	# find ${outputDir}/capstone_test/data -type f -name 'output_*.zst' | parallel --jobs ${jobs} --plus ${CURDIR}/yodns/yodns/yodns convertFormat --in={} --out=${outputDir}/capstone_test/json/{/..}.json
 	
 
 # This runs a minimal experiment to showcase how to use yodns and evaluate its results

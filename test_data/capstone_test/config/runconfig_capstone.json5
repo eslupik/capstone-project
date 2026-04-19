@@ -13,12 +13,12 @@
 		"BackoffValuesInMs": [0, 200, 500, 1000, 3000 ],
 	},
 	"Input": {
-		"Path": "/home/local/slupike/capstone-project/config/capstone_config/subfinder_example_500.csv",
+		"Path": "/home/local/slupike/capstone-project/config/capstone_config/subfinder_candidates.csv",
 		"CSVColumnIndex": 2,
 		"CSVSeparator": ",",
 		"Offset": 1,
 		"BatchSize": 20,
-		"Len": 500,
+		"Len": 3145,
 		"PSLPath": "/home/local/slupike/capstone-project/config/capstone_config/public_suffix_list.dat"
 	},
 	"Output": {
@@ -26,7 +26,7 @@
 		"Format": "protobuf",
 		"Zip": "zst:fast",
 		"Path": "/home/local/slupike/capstone-project/test_data/capstone_test/data",
-		"ParallelFiles": 1
+		"ParallelFiles": 5
 	},
 	"Caching": {
 		"InfraDumpFile": "infra.json",
