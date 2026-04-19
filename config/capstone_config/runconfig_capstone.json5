@@ -22,11 +22,11 @@
 		"PSLPath": "/home/local/slupike/capstone-project/config/capstone_config/public_suffix_list.dat"
 	},
 	"Output": {
-		"FileSize": 200,
+		"FileSize": 300,
 		"Format": "protobuf",
 		"Zip": "zst:fast",
-		"Path": "/home/local/slupike/capstone-project/test_data/capstone_test/data",
-		"ParallelFiles": 5
+		"Path": "/home/local/slupike/capstone-project/test_data/capstone_3K/data",
+		"ParallelFiles": 10
 	},
 	"Caching": {
 		"InfraDumpFile": "infra.json",

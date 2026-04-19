@@ -26,7 +26,7 @@
 		"Format": "protobuf",
 		"Zip": "zst:fast",
 		"Path": "/home/local/slupike/capstone-project/test_data/capstone_test/data",
-		"ParallelFiles": 5
+		"ParallelFiles": 2
 	},
 	"Caching": {
 		"InfraDumpFile": "infra.json",

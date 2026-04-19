@@ -15,16 +15,16 @@ build:
 # This runs a minimal experiment to showcase how to use yodns and evaluate its results
 # The experiment includes a scan, validation of the results, and an evaluation.
 capstone_test: build 
-	mkdir -p ${outputDir}/capstone_test
-	mkdir -p ${outputDir}/capstone_test/data ${outputDir}/capstone_test/config ${outputDir}/capstone_test/validate ${outputDir}/capstone_test/json
+	mkdir -p ${outputDir}/capstone_3K
+	mkdir -p ${outputDir}/capstone_3K/data ${outputDir}/capstone_3K/config ${outputDir}/capstone_3K/validate ${outputDir}/capstone_3K/json
 	sudo setcap cap_net_raw=eip ./yodns/yodns/yodns # allows ICMP packets to be received
-	cp -r ${configDir}/capstone_config/* ${outputDir}/capstone_test/config # copy config so we know which config was used for the run
+	cp -r ${configDir}/capstone_config/* ${outputDir}/capstone_3K/config # copy config so we know which config was used for the run
 	# Run scan!
-	cd ${outputDir}/capstone_test; ${CURDIR}/yodns/yodns/yodns scan --config=${CURDIR}/${configDir}/capstone_config/runconfig_capstone.json5 --threads 30 --ipv4-only
+	cd ${outputDir}/capstone_3K; ${CURDIR}/yodns/yodns/yodns scan --config=${CURDIR}/${configDir}/capstone_config/runconfig_capstone.json5 --threads 30 --ipv4-only
 	# Validate the output [optional]
-	find ${outputDir}/capstone_test/data -type f -name 'output_*.zst' | parallel --jobs ${jobs} --plus ${CURDIR}/yodns/yodns/yodns validate --in={} --out=${outputDir}/capstone_test/validate/{/..}.json.zst --zip "zst" --printnoerr
+	find ${outputDir}/capstone_3K/data -type f -name 'output_*.zst' | parallel --jobs ${jobs} --plus ${CURDIR}/yodns/yodns/yodns validate --in={} --out=${outputDir}/capstone_3K/validate/{/..}.json.zst --zip "zst" --printnoerr
 	# Convert to json format [optional]
-	# find ${outputDir}/capstone_test/data -type f -name 'output_*.zst' | parallel --jobs ${jobs} --plus ${CURDIR}/yodns/yodns/yodns convertFormat --in={} --out=${outputDir}/capstone_test/json/{/..}.json
+	# find ${outputDir}/capstone_3K/data -type f -name 'output_*.zst' | parallel --jobs ${jobs} --plus ${CURDIR}/yodns/yodns/yodns convertFormat --in={} --out=${outputDir}/capstone_3K/json/{/..}.json
 	
 
 # This runs a minimal experiment to showcase how to use yodns and evaluate its results
