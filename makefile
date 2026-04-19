@@ -17,7 +17,7 @@ build:
 capstone_test: build 
 	mkdir -p ${outputDir}/capstone_test
 	mkdir -p ${outputDir}/capstone_test/data ${outputDir}/capstone_test/config ${outputDir}/capstone_test/validate ${outputDir}/capstone_test/json
-	# sudo setcap cap_net_raw=eip ./yodns/yodns/yodns # allows ICMP packets to be received
+	sudo setcap cap_net_raw=eip ./yodns/yodns/yodns # allows ICMP packets to be received
 	cp -r ${configDir}/capstone_config/* ${outputDir}/capstone_test/config # copy config so we know which config was used for the run
 	# Run scan!
 	cd ${outputDir}/capstone_test; ${CURDIR}/yodns/yodns/yodns scan --config=${CURDIR}/${configDir}/capstone_config/runconfig_capstone.json5 --threads 30 --ipv4-only
