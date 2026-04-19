@@ -13,18 +13,19 @@
 		"BackoffValuesInMs": [0, 200, 500, 1000, 3000 ],
 	},
 	"Input": {
-		"Path": "config/targetlist_local.csv",
-		"CSVColumnIndex": 1,
+		"Path": "/home/local/slupike/capstone-project/config/capstone_config/example_target_1.csv",
+		"CSVColumnIndex": 0,
 		"CSVSeparator": ",",
 		"Offset": 0,
 		"BatchSize": 20,
-		"Len": 10000
+		"Len": 10000,
+		"PSLPath": "/home/local/slupike/capstone-project/config/capstone_config/public_suffix_list.dat"
 	},
 	"Output": {
 		"FileSize": 200,
 		"Format": "protobuf",
 		"Zip": "zst:fast",
-		"Path": "scan",
+		"Path": "/home/local/slupike/capstone-project/test_data/capstone_test/data",
 		"ParallelFiles": 5
 	},
 	"Caching": {
@@ -54,7 +55,7 @@
 	"TrustAllTLDs": false,
 	"TrustedZones": [ ".",  "com.", "net.", "org.", "root-servers.net." ],
 	"TrustedZoneNSCount": 2,
-	"DoNotScanList": "config/doNotScan.csv",
+	"DoNotScanList": "/home/local/slupike/capstone-project/config/capstone_config/doNotScan.csv",
 	"Loglevel": "info",
 	"Logfile": "log.log",
 	"MaxCNAMEDepth": 64,

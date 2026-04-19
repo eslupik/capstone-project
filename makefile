@@ -5,7 +5,7 @@ configDir=config
 outputDir = test_data
 
 experiment = capstone_test
-scanDataDir = input_targets
+scanDataDir = config
 exampleDataDir = data
 jobs = 4
 
@@ -20,9 +20,9 @@ capstone_test: build
 	# sudo setcap cap_net_raw=eip ./yodns/yodns/yodns # allows ICMP packets to be received
 	cp -r ${configDir}/capstone_config/* ${outputDir}/capstone_test/config # copy config so we know which config was used for the run
 	# Run scan!
-	cd ${outputDir}/capstone_test; cat ${CURDIR}/${scanDataDir}/example_target_1.csv | ${CURDIR}/yodns/yodns/yodns scan --config=${CURDIR}/${configDir}/capstone_config/runconfig_capstone.json5 --threads 30 --ipv4-only
+	${CURDIR}/yodns/yodns/yodns scan --config=${CURDIR}/${configDir}/capstone_config/runconfig_capstone.json5 --threads 30 --ipv4-only
 	# Convert to json format [optional]
-	find ${outputDir}/capstone_test/data -type f -name 'output_*.zst' | parallel --jobs ${jobs} --plus ${CURDIR}/yodns/yodns/yodns convertFormat --in={} --out=${outputDir}/capstone_test/json/{/..}.json --printnoerr
+	find ${outputDir}/capstone_test/data -type f -name 'output_*.zst' | parallel --jobs ${jobs} --plus ${CURDIR}/yodns/yodns/yodns convertFormat --in={} --out=${outputDir}/capstone_test/json/{/..}.json
 	
 
 # This runs a minimal experiment to showcase how to use yodns and evaluate its results
