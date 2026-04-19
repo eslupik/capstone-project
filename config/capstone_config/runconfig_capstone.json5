@@ -18,7 +18,7 @@
 		"CSVSeparator": ",",
 		"Offset": 0,
 		"BatchSize": 20,
-		"Len": 10000,
+		"Len": 1,
 		"PSLPath": "/home/local/slupike/capstone-project/config/capstone_config/public_suffix_list.dat"
 	},
 	"Output": {
@@ -26,7 +26,7 @@
 		"Format": "protobuf",
 		"Zip": "zst:fast",
 		"Path": "/home/local/slupike/capstone-project/test_data/capstone_test/data",
-		"ParallelFiles": 5
+		"ParallelFiles": 1
 	},
 	"Caching": {
 		"InfraDumpFile": "infra.json",

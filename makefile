@@ -20,7 +20,7 @@ capstone_test: build
 	# sudo setcap cap_net_raw=eip ./yodns/yodns/yodns # allows ICMP packets to be received
 	cp -r ${configDir}/capstone_config/* ${outputDir}/capstone_test/config # copy config so we know which config was used for the run
 	# Run scan!
-	${CURDIR}/yodns/yodns/yodns scan --config=${CURDIR}/${configDir}/capstone_config/runconfig_capstone.json5 --threads 30 --ipv4-only
+	cd ${outputDir}/capstone_test; ${CURDIR}/yodns/yodns/yodns scan --config=${CURDIR}/${configDir}/capstone_config/runconfig_capstone.json5 --threads 30 --ipv4-only
 	# Convert to json format [optional]
 	find ${outputDir}/capstone_test/data -type f -name 'output_*.zst' | parallel --jobs ${jobs} --plus ${CURDIR}/yodns/yodns/yodns convertFormat --in={} --out=${outputDir}/capstone_test/json/{/..}.json
 	
@@ -35,7 +35,7 @@ my_experiment: build
 	# ---------------------------------------------------------------------------------
 	# -- THIS IS A MINIMAL RUN CONFIGURATION AND NOT INTENDED FOR LARGE SCALE SCANS! --
 	# ---------------------------------------------------------------------------------
-	cd ${outputDir}/example_test; cat ${CURDIR}/${scanDataDir}/example_target_1.csv | ${CURDIR}/yodns/yodns/yodns scan --config=${CURDIR}/${configDir}/example_config/runconfig_capstone.json5 --ipv4-only
+	cd ${outputDir}; cat ${CURDIR}/${scanDataDir}/example_target_1.csv | ${CURDIR}/yodns/yodns/yodns scan --config=${CURDIR}/${configDir}/example_config/runconfig_capstone.json5 --ipv4-only
 	# Validate the output [optional]
 	find ${outputDir}/example_test/data -type f -name 'output_*.zst' | parallel --jobs ${jobs} --plus ${CURDIR}/yodns/yodns/yodns validate --in={} --out=${outputDir}/example_test/validate/{/..}.json.zst --zip "zst" --printnoerr
 	# Count the number of zone dependencies
