@@ -25,7 +25,7 @@
 		"FileSize": 300,
 		"Format": "protobuf",
 		"Zip": "zst:fast",
-		"Path": "/home/local/slupike/capstone-project/test_data/capstone_3K/data",
+		"Path": "data",
 		"ParallelFiles": 10
 	},
 	"Caching": {
@@ -48,7 +48,7 @@
 		"TimeoutInMs":     2500,
 		"DialTimeoutInMs": 3000
 	},
-	"EnableICMP": false,
+	"EnableICMP": true,
 	"ICMPOutPath": "icmp.log",
 
 	"AllNameServerIPs": true,
