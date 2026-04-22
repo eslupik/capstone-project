@@ -2,10 +2,10 @@ rev=$(shell git rev-parse --short HEAD)
 date=$(shell date +%F-%H-%M)
 runDir=${date}_${rev}
 
-outSubDir = Output_5101_DN
+outSubDir = Output_500_DN
 configSubDir = capstone_config
-inputFile = subfinder_candidates_5100_13.csv
-inputLen = 5101
+inputFile = subfinder_example_500.csv
+inputLen = 500
 
 configDir = config
 outputDir = YoDNS_output
@@ -59,13 +59,15 @@ filter_results: build
 	#Filter level 1: Get relevant rtypes
 	# Get authorized A records
 	find ${folder}/data -type f -name 'output_*.zst' | parallel --jobs ${jobs} --plus ${CURDIR}/yodns/yodns/yodns extractMessages --in={} --out=${folder}/filtered/Auth/A_REC/{/..}_Auth_A_REC.json.zst --zip "zst" --aa --qtype=1 --rtype=1
+	find ${folder}/Auth/A_REC -type f -name 'output_*.zst' | parallel --jobs ${jobs} --plus ${CURDIR}/yodns/yodns/yodns mergeFiles --in={} --out-dir=${folder}/filtered/Auth/A_REC --format=json --zip "zst" --dedup=true --size=500
+	
 	#Get authorized AAAA records
-	find ${folder}/data -type f -name 'output_*.zst' | parallel --jobs ${jobs} --plus ${CURDIR}/yodns/yodns/yodns extractMessages --in={} --out=${folder}/filtered/Auth/AAAA_REC/{/..}_Auth_AAAA_REC.json.zst --zip "zst" --aa --qtype=28 --rtype=28
+	#find ${folder}/data -type f -name 'output_*.zst' | parallel --jobs ${jobs} --plus ${CURDIR}/yodns/yodns/yodns extractMessages --in={} --out=${folder}/filtered/Auth/AAAA_REC/{/..}_Auth_AAAA_REC.json.zst --zip "zst" --aa --qtype=28 --rtype=28
 	#Get NS records
-	find ${folder}/data -type f -name 'output_*.zst' | parallel --jobs ${jobs} --plus ${CURDIR}/yodns/yodns/yodns extractMessages --in={} --out=${folder}/filtered/NS/{/..}_NS_REC.json.zst --zip "zst" --qtype=2 --rtype=2
+	#find ${folder}/data -type f -name 'output_*.zst' | parallel --jobs ${jobs} --plus ${CURDIR}/yodns/yodns/yodns extractMessages --in={} --out=${folder}/filtered/NS/{/..}_NS_REC.json.zst --zip "zst" --qtype=2 --rtype=2
 	
 	#Filter level 2: Try to find Glue Records
-	find ${folder}/filtered/NS -type f -name 'output_*.zst' | parallel --jobs ${jobs} --plus ${CURDIR}/yodns/yodns/yodns extractMessages --in={} --out=${folder}/filtered/NS/A_REC{/..}_NS_A_REC.json.zst --zip "zst" --rtype=1
+	#find ${folder}/filtered/NS -type f -name 'output_*.zst' | parallel --jobs ${jobs} --plus ${CURDIR}/yodns/yodns/yodns extractMessages --in={} --out=${folder}/filtered/NS/A_REC{/..}_NS_A_REC.json.zst --zip "zst" --rtype=1
 	
 
 
