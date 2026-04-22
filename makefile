@@ -2,13 +2,13 @@ rev=$(shell git rev-parse --short HEAD)
 date=$(shell date +%F-%H-%M)
 runDir=${date}_${rev}
 
-outSubDir = 10_Domains
+outSubDir = Microsoft
 configSubDir = capstone_config
-inputFile = subfinder_example_10.csv
-inputLen = 10
+inputFile = example_target_1.csv
+inputLen = 1
 
 configDir=config
-outputDir = test_data
+outputDir = forChenyun
 
 folder = ${outputDir}/${outSubDir}
 config = ${configDir}/${configSubDir}
@@ -27,7 +27,8 @@ run_scan: build
 
 	# Make folders to store scan results
 	mkdir -p folder
-	mkdir -p ${folder}/data ${folder}/config ${folder}/validate ${folder}/stats ${folder}/logs
+	mkdir -p ${folder}/data ${folder}/config ${folder}/stats ${folder}/logs 
+	mkdir -p ${folder}/json ${folder}/validate #Optional files for testing/debugging
 
 	# Prepare for scan
 	sudo setcap cap_net_raw=eip ./yodns/yodns/yodns # allows ICMP packets to be received
@@ -39,9 +40,12 @@ run_scan: build
 	# Validate the output [optional]
 	find ${folder}/data -type f -name 'output_*.zst' | parallel --jobs ${jobs} --plus ${CURDIR}/yodns/yodns/yodns validate --in={} --out=${folder}/validate/{/..}_Validate_Rec.json.zst --zip "zst" --printnoerr
 	
-	#Get stats on domains to check functionality/scan success
+	# Get stats on domains to check functionality/scan success
 	find ${folder}/data -type f -name 'output_*.zst' | parallel --jobs ${jobs} --plus ${CURDIR}/yodns/yodns/yodns stats --in={} --out=${folder}/stats/{/..}_Stats.json.zst 
 
+	# Convert to json format [optional]
+	find ${folder}/data -type f -name 'output_*.zst' | parallel --jobs ${jobs} --plus ${CURDIR}/yodns/yodns/yodns convertFormat --in={} --out=${folder}/json/{/..}.json
+	
 	
 # This runs a test of the capstone YoDNS configuration
 # The experiment includes a scan, validation of the results, and (optionally) converts the output files to json format for visual inspection.
