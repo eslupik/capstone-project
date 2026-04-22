@@ -130,6 +130,24 @@ At this stage, we need to:
 
 ---
 
+## Current Results/Artifacts
+
+### 1. run_scan and filter_results makefile functions
+- Both present in the `makefile` within the main repository folder, in addition to earlier experiments, the makefile allows you to:
+     A) Run YoDNS scans on any example dataset and place results in any output folder, with options to run commands for scan validation and scan statistics to ensure scan success.
+     B) Filter binary YoDNS output file messages for authoritatative A and AAAA records, along with all NS records.
+
+### 2. Output files for scans of varying sizes
+- Present in subfolder the `YoDNS_output` folder, all raw YoDNS scan output is accessible in zipped binary (in `Output_#_DN/data`, `output_#.pb.zst` format) and json format (zipped or unzipped depending on file size, in `Output_#_DN/json`, `output_#.json.zst` or `output_#.json` format).
+- Validation and stat output files are located in their respective subfolders.
+- Filtered extracted messages from raw binary output files are present in the `Output_#_DN/filtered` subfolder.
+   - So far, we have managed to filter all messages containing:
+      A) Authoritative A record (Ipv4) answers.
+      B) Authoritative AAAA record (Ipv6) answers.
+      C) All NS record answers.
+ 
+---
+
 ## Next Steps
 
 Our next tasks are:
