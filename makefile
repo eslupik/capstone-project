@@ -1,10 +1,18 @@
 rev=$(shell git rev-parse --short HEAD)
 date=$(shell date +%F-%H-%M)
 runDir=${date}_${rev}
+
+outSubDir = 10_Domains
+configSubDir = capstone_config
+inputFile = subfinder_example_10.csv
+inputLen = 10
+
 configDir=config
 outputDir = test_data
 
-experiment = capstone_test
+folder = ${outputDir}/${outSubDir}
+config = ${configDir}/${configSubDir}
+
 scanDataDir = config
 exampleDataDir = data
 jobs = 4
@@ -12,11 +20,34 @@ jobs = 4
 build:
 	cd yodns/yodns && go build 
 
+
+# This runs a test of the capstone YoDNS configuration
+# This includes the SCANNING portion of the experiment, producing binary (.pb.zst) output files for future analysis
+run_scan: build 
+
+	# Make folders to store scan results
+	mkdir -p folder
+	mkdir -p ${folder}/data ${folder}/config ${folder}/validate ${folder}/stats ${folder}/logs
+
+	# Prepare for scan
+	sudo setcap cap_net_raw=eip ./yodns/yodns/yodns # allows ICMP packets to be received
+	cp -r ${config}/* ${folder}/config # copy config so we know which config was used for the run
+	
+	# Run scan!
+	cd ${folder}; ${CURDIR}/yodns/yodns/yodns scan --i=${CURDIR}/${config}/${inputFile} --len=${inputLen} --config=${CURDIR}/${config}/runconfig_capstone.json5  --threads 30 --ipv4-only 
+	
+	# Validate the output [optional]
+	find ${folder}/data -type f -name 'output_*.zst' | parallel --jobs ${jobs} --plus ${CURDIR}/yodns/yodns/yodns validate --in={} --out=${folder}/validate/{/..}_Validate_Rec.json.zst --zip "zst" --printnoerr
+	
+	#Get stats on domains to check functionality/scan success
+	find ${folder}/data -type f -name 'output_*.zst' | parallel --jobs ${jobs} --plus ${CURDIR}/yodns/yodns/yodns stats --in={} --out=${folder}/stats/{/..}_Stats.json.zst 
+
+	
 # This runs a test of the capstone YoDNS configuration
 # The experiment includes a scan, validation of the results, and (optionally) converts the output files to json format for visual inspection.
 capstone_eval: build 
 	mkdir -p ${outputDir}/capstone_3K_EVAL
-	mkdir -p ${outputDir}/capstone_3K_EVAL/data ${outputDir}/capstone_3K_EVAL/config ${outputDir}/capstone_3K_EVAL/validate ${outputDir}/capstone_3K_EVAL/Auth/A_REC ${outputDir}/capstone_3K_EVAL/Auth/AAAA_REC ${outputDir}/capstone_3K_EVAL/NS
+	mkdir -p ${outputDir}/capstone_3K_EVAL/data ${outputDir}/capstone_3K_EVAL/config ${outputDir}/capstone_3K_EVAL/validate ${outputDir}/capstone_3K_EVAL/Auth/A_REC ${outputDir}/capstone_3K_EVAL/Auth/AAAA_REC ${outputDir}/capstone_3K_EVAL/NS ${outputDir}/capstone_3K_EVAL/NS/A_REC
 	sudo setcap cap_net_raw=eip ./yodns/yodns/yodns # allows ICMP packets to be received
 	cp -r ${configDir}/capstone_config/* ${outputDir}/capstone_3K_EVAL/config # copy config so we know which config was used for the run
 	# Run scan!
@@ -34,6 +65,9 @@ capstone_eval: build
 	find ${outputDir}/capstone_3K_EVAL/data -type f -name 'output_*.zst' | parallel --jobs ${jobs} --plus ${CURDIR}/yodns/yodns/yodns extractMessages --in={} --out=${outputDir}/capstone_3K_EVAL/Auth/AAAA_REC/{/..}_Auth_AAAA_REC.json.zst --zip "zst" --aa --qtype=28 --rtype=28
 	#Get NS records
 	find ${outputDir}/capstone_3K_EVAL/data -type f -name 'output_*.zst' | parallel --jobs ${jobs} --plus ${CURDIR}/yodns/yodns/yodns extractMessages --in={} --out=${outputDir}/capstone_3K_EVAL/NS/{/..}_NS_REC.json.zst --zip "zst" --qtype=2 --rtype=2
+	
+	#Try to find Glue Records
+	find ${outputDir}/capstone_3K_EVAL/NS -type f -name 'output_*.zst' | parallel --jobs ${jobs} --plus ${CURDIR}/yodns/yodns/yodns extractMessages --in={} --out=${outputDir}/capstone_3K_EVAL/NS/A_REC{/..}_NS_A_REC.json.zst --zip "zst"  --rtype=1
 	
 
 

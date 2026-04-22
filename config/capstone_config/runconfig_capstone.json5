@@ -26,10 +26,10 @@
 		"Format": "protobuf",
 		"Zip": "zst:fast",
 		"Path": "data",
-		"ParallelFiles": 10
+		"ParallelFiles": 1
 	},
 	"Caching": {
-		"InfraDumpFile": "infra.json",
+		"InfraDumpFile": "logs/infra.json",
 		"InfraTTLInSeconds": 300,
 		"Capacity": 3000000
 	},
@@ -49,7 +49,7 @@
 		"DialTimeoutInMs": 3000
 	},
 	"EnableICMP": true,
-	"ICMPOutPath": "icmp.log",
+	"ICMPOutPath": "logs/icmp.log",
 
 	"AllNameServerIPs": true,
 	"TrustAllTLDs": false,
@@ -57,7 +57,7 @@
 	"TrustedZoneNSCount": 2,
 	"DoNotScanList": "/home/local/slupike/capstone-project/config/capstone_config/doNotScan.csv",
 	"Loglevel": "info",
-	"Logfile": "log.log",
+	"Logfile": "logs/log.log",
 	"MaxCNAMEDepth": 64,
 	"GatherDNSSEC": true,
 	"Modules": [ ],
