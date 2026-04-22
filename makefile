@@ -2,12 +2,12 @@ rev=$(shell git rev-parse --short HEAD)
 date=$(shell date +%F-%H-%M)
 runDir=${date}_${rev}
 
-outSubDir = Output_1_DN
+outSubDir = Output_5101_DN
 configSubDir = capstone_config
-inputFile = example_target_1.csv
-inputLen = 1
+inputFile = subfinder_candidates_5100_13.csv
+inputLen = 5101
 
-configDir=config
+configDir = config
 outputDir = YoDNS_output
 
 folder = ${outputDir}/${outSubDir}
@@ -42,7 +42,7 @@ run_scan: build
 	find ${folder}/data -type f -name 'output_*.zst' | parallel --jobs ${jobs} --plus ${CURDIR}/yodns/yodns/yodns stats --in={} --out=${folder}/stats/{/..}_Stats.json.zst 
 
 	# Convert to json format [optional]
-	find ${folder}/data -type f -name 'output_*.zst' | parallel --jobs ${jobs} --plus ${CURDIR}/yodns/yodns/yodns convertFormat --in={} --out=${folder}/json/{/..}.json
+	find ${folder}/data -type f -name 'output_*.zst' | parallel --jobs ${jobs} --plus ${CURDIR}/yodns/yodns/yodns convertFormat --in={} --out=${folder}/json/{/..}.json.zst --zip "zst"
 	
 	
 # This runs a test of the capstone YoDNS configuration

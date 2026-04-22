@@ -26,7 +26,7 @@
 		"Format": "protobuf",
 		"Zip": "zst:fast",
 		"Path": "data",
-		"ParallelFiles": 1
+		"ParallelFiles": 25
 	},
 	"Caching": {
 		"InfraDumpFile": "logs/infra.json",
