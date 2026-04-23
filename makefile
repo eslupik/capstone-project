@@ -70,7 +70,7 @@ filter_results: build
 	
 	#Get NS records
 	# find ${folder}/data -type f -name 'output_*.zst' | parallel --jobs ${jobs} --plus ${CURDIR}/yodns/yodns/yodns extractMessages --in={} --out=${folder}/filtered/NS/{/..}_NS_REC.json.zst --zip "zst" --qtype=2 --rtype=2
-	find ${folder}/data -type f -name 'output_*.zst' | parallel --jobs ${jobs} --plus ${CURDIR}/yodns/yodns/yodns extractMessagesGlue --in={} --out=${folder}/filtered/NS/{/..}_NS_REC.json.zst --zip "zst" --glue-only=true --qtype=2 --rtype=2
+	find ${folder}/data -type f -name 'output_*.zst' | parallel --jobs ${jobs} --plus ${CURDIR}/yodns/yodns/yodns extractMessagesGlue --in={} --out=${folder}/filtered/NS/{/..}_NS_REC.json.zst --zip "zst" --glue-only=true --qtype=2 --rtype=2 --glue-type=1
 
 	
 	#Filter level 2: Try to find Glue Records
