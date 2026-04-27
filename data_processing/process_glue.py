@@ -70,6 +70,7 @@ def process_json(auth_data: list, type: int):
 
 
 def compare_recs(auth_dict: dict, glue_dict: dict):
+    '''Compares the records of two dictionaries to determine if there are glue records not validated by authoritative records'''
 
     #Create dict to store entries present in glue records but not authoritative records
     inconsistent_dict = {} 
