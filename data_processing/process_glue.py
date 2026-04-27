@@ -4,7 +4,7 @@ from pprint import pprint
 from typing import Final
 
 
-num_dns = '5101'
+num_dns = '9295'
 NUM_DNs: Final[str] = num_dns
 
 AUTH_MESSAGE: Final[str] = 'Answer'
@@ -25,7 +25,7 @@ def load_json_file(filepath: Path, message_type: str):
     (authoritative or glue) for analysis'''
 
     json_files = list(Path.glob(filepath, "*.json"))
-    #print(json_files)
+    #pprint(json_files)
 
     rec_dict = {}
 

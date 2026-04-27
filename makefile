@@ -2,10 +2,13 @@ rev=$(shell git rev-parse --short HEAD)
 date=$(shell date +%F-%H-%M)
 runDir=${date}_${rev}
 
-outSubDir = Output_5101_DN
+outSubDir = Output_9295_DN
+
+# Scan parameters (the only parameter change that must occur within the config json file is "ParallelFiles")
 configSubDir = capstone_config
-inputFile = subfinder_example_500.csv
-inputLen = 500
+inputFile = subfinder_candidates_9296.csv
+inputLen = 10000
+parallelFiles = 30
 
 configDir = config
 outputDir = YoDNS_output
@@ -34,7 +37,7 @@ run_scan: build
 	cp -r ${config}/* ${folder}/config # copy config so we know which config was used for the run
 	
 	# Run scan!
-	# cd ${folder}; ${CURDIR}/yodns/yodns/yodns scan --i=${CURDIR}/${config}/${inputFile} --len=${inputLen} --config=${CURDIR}/${config}/runconfig_capstone.json5  --threads 30 --ipv4-only 
+	cd ${folder}; ${CURDIR}/yodns/yodns/yodns scan --i=${CURDIR}/${config}/${inputFile} --len=${inputLen} --config=${CURDIR}/${config}/runconfig_capstone.json5  --threads 30 --ipv4-only --paraFiles ${parallelFiles}
 	
 	# Validate the output [optional]
 	find ${folder}/data -type f -name 'output_*.zst' | parallel --jobs ${jobs} --plus ${CURDIR}/yodns/yodns/yodns validate --in={} --out=${folder}/validate/{/..}_Validate_Rec.json.zst --zip "zst" --printnoerr

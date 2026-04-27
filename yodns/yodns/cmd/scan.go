@@ -202,6 +202,7 @@ func defineFlags(flags *pflag.FlagSet, options *runner.Options) {
 	flags.StringVar(&options.Output.Path, "o", options.Output.Path, "The path to the output directory")
 	flags.UintVar(&options.Output.FileSize, "s", options.Output.FileSize,
 		"The maximum number of elements that is written to a single file. There is no guarantee that any fill will actually contain that many elements.")
+	flags.Uint32Var(&options.Output.ParallelFiles, "paraFiles", options.Output.ParallelFiles, "Number of parallel files")
 
 	flags.UintVar(&options.MaxParallelism, "p", options.MaxParallelism, "The amount of domains that are resolved in parallel.")
 	flags.StringVar(&options.Loglevel, "loglevel", options.Loglevel, "Sets the log level. Values are 'debug', 'info', 'warning' and 'disabled'")
