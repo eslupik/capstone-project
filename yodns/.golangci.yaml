@@ -1,0 +1,103 @@
+# Documentation at https://golangci-lint.run
+output:
+  formats:
+    - format: tab
+      path: stderr
+  path-prefix: ""
+issues:
+  exclude-rules:
+    - path: (.+)_test.go
+      linters:
+        - funlen
+        - wastedassign
+        - gosec
+        - errcheck
+        - cyclop
+        - err113
+        - wsl
+        - forbidigo
+        - nilnil
+        - forcetypeassert
+    - path: cmd/(.+).go
+      linters:
+        - gochecknoinits
+        - forbidigo
+linters:
+  disable-all: true
+  enable:
+    - errchkjson
+    - errname
+    - errorlint
+    - exhaustive
+    - exportloopref
+    - forbidigo
+    - forcetypeassert
+    - funlen
+    - gochecknoinits
+    - gocognit
+    - goconst
+    - gocritic
+    - asasalint
+    - asciicheck
+    - bidichk
+    - containedctx
+    - contextcheck
+    - decorder
+    - dogsled
+    - dupl
+    - dupword
+    - durationcheck
+    - err113
+    - goheader
+    - mnd
+    - gomoddirectives
+    - gosec
+    - govet
+    - grouper
+    - importas
+    - interfacebloat
+    - ireturn
+    - lll
+    - loggercheck
+    - maintidx
+    - makezero
+    - nakedret
+    - nestif
+    - nilerr
+    - nilnil
+    - nosprintfhostport
+    - prealloc
+    - predeclared
+    - promlinter
+    - reassign
+    - thelper
+    - tparallel
+    - unconvert
+    - unparam
+    - wastedassign
+    - whitespace
+    - wrapcheck
+    # Maybe we can enable wsl in the future. I feel that it improves readability, but it is a very annoying one...
+    # - wsl
+linters-settings:
+  lll:
+    line-length: 160
+    # Tab width in spaces.
+    # Default: 1
+    tab-width: 1
+
+  wsl:
+    # https://golangci-lint.run/usage/linters/#wsl
+    # Allows assignments to be cuddled with anything.
+    #allow-assign-and-anything: true
+    # Allow multiple var/declaration statements to be cuddled.
+    #allow-cuddle-declarations: true
+    # Controls if you may cuddle assignments and calls without needing an empty line between them.
+    #allow-assign-and-call: true
+  funlen:
+    # We allow longer functions so the linter is not too intrusive,
+    # but after a certain point, we should split them into smaller ones
+    # Default: 60
+    lines: 120
+    # Default: 40
+    statements: 80

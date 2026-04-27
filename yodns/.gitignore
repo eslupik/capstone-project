@@ -1,0 +1,6 @@
+**/*.exe
+yodns/yodns
+.idea/
+.vscode/
+resolver/test/out/
+data/

@@ -1,0 +1,61 @@
+syntax = "proto3";
+package io;
+
+option go_package = "/protobuf";
+
+import "google/protobuf/timestamp.proto";
+
+message Resolution {
+  repeated string domains = 1;
+  google.protobuf.Timestamp startTime = 2;
+  int64 duration = 3;
+  Zone zoneData = 4;
+  repeated string tags = 5;
+  repeated uint64 idx = 6;
+}
+
+message Zone {
+  string name = 1;
+  repeated Zone subZones = 2;
+  repeated NameServer nameServers = 3;
+}
+
+message NameServer {
+  string name = 1;
+  repeated string ipAddresses = 2;
+}
+
+// On using "optional" to decrease message size:
+// Idea: Use "optional" fields with reasonable defaults (set in application logic) to reduce message size.
+// However, this behavior is already implemented in protobuf to some extent, so the gains would be marginal:
+// "Also note that if a scalar message field is set to its default, the value will not be serialized on the wire"
+// (from https://protobuf.dev/programming-guides/proto3/#default)
+
+message MessageExchange {
+  Question originalQuestion = 1;
+  string responseAddr = 2;
+  string nameServerIp = 3;
+  Metadata metadata = 4;
+  bytes message = 5; // The DNS message in wire-encoding
+  string error_message = 6;
+  string error_code = 7;
+}
+
+message Question {
+  string name = 1;
+  uint32 type = 2;
+  uint32 class = 3;
+}
+
+message Metadata {
+  bool fromCache = 1;
+  uint32 retryIdx = 2;
+  bytes connId = 3; // We use bytes, so we can store any kind of id, not just valid UTF-8 strings
+  bool tcp  = 4;
+  bytes correlationId = 5; // We use bytes, so we can store any kind of id, not just valid UTF-8 strings
+  bytes parentId = 6; // We use bytes, so we can store any kind of id, not just valid UTF-8 strings
+  google.protobuf.Timestamp enqueueTime = 7;
+  google.protobuf.Timestamp dequeueTime = 8;
+  bool isFinal = 9;
+  int64 rtt = 10;
+}

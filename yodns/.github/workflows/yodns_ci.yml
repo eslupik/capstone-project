@@ -1,0 +1,83 @@
+name: YoDNS CI
+
+on:
+  pull_request:
+    branches:
+      - "*"
+    paths:
+      - 'client/**'
+      - 'resolver/**'
+      - 'yodns/**'
+      - '.github/workflows/yodns_ci.yml'
+
+
+  push:
+    branches:
+      - "*"
+    paths:
+      - 'client/**'
+      - 'resolver/**'
+      - 'yodns/**'
+      - '.github/workflows/yodns_ci.yml'
+
+jobs:
+  code-style:
+    runs-on: ubuntu-latest    
+
+    steps:
+    - name: Setup Golang
+      uses: actions/setup-go@v4
+      with:
+        go-version: 1.22
+
+    - name: Checkout Code
+      uses: actions/checkout@v3
+
+    - name: Run Linters
+      uses: golangci/golangci-lint-action@v3
+      with:
+        version: latest
+        working-directory: ./yodns
+        args: run ./... --timeout 5m0s
+      continue-on-error: true
+
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Setup Golang
+      uses: actions/setup-go@v4
+      with:
+        go-version: 1.22
+
+    - name: Checkout Code
+      uses: actions/checkout@v3
+
+    - name: Run Tests
+      working-directory: ./yodns
+      run: go test -race -cover -v ./...
+
+
+  build:
+    runs-on: ubuntu-latest
+    needs:
+      - test
+
+    steps:
+    - name: Setup Golang
+      uses: actions/setup-go@v4
+      with:
+        go-version: 1.22
+
+    - name: Checkout Code
+      uses: actions/checkout@v3
+
+    - name: Build Artifact
+      working-directory: ./yodns
+      run: go build -o build/yodns
+
+    - name: Upload Build Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: yodns
+        path: ./yodns/build/yodns

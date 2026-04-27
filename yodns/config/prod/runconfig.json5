@@ -1,0 +1,154 @@
+{
+	"Comment": "Config for running locally",
+	"MaxParallelism": 600,
+	"MaxBatchParallelism": 200,
+	"MaxQueriesPerSecondPerIP": 50,
+	"MaxInflightPerIP": 50,
+	"ResolutionTimeoutInSeconds": 3600,
+	"MaxQueriesPerResolution": 4000000,
+	"WarmUp": true,
+	"Retry": {
+		"MaxRetries": 5,
+		"Backoff": "Values",
+		"BackoffValuesInMs": [0, 200, 500, 1000, 3000 ],
+	},
+	"Input": {
+		"Path": "config/targetlist_local.csv",
+		"CSVColumnIndex": 1,
+		"CSVSeparator": ",",
+		"Offset": 0,
+		"BatchSize": 20,
+		"Len": 10000
+	},
+	"Output": {
+		"FileSize": 200,
+		"Format": "protobuf",
+		"Zip": "zst:fast",
+		"Path": "scan",
+		"ParallelFiles": 5
+	},
+	"Caching": {
+		"InfraDumpFile": "infra.json",
+		"InfraTTLInSeconds": 300,
+		"Capacity": 3000000
+	},
+	"UDP": {
+		"Disable": false,
+		"TimeoutInMs":3000,
+		"PoolSize": 80
+	},
+	"RateLimitingTimeoutInSeconds": 600,
+	"TCP": {
+		"Disable": false,
+		"EphemeralConns": 5000,
+		"PoolSize": 3000,
+		"IdlePeriodInMs": 30000,
+		"UseKeepAlive": true,
+		"TimeoutInMs":     2500,
+		"DialTimeoutInMs": 3000
+	},
+	"EnableICMP": true,
+	"ICMPOutPath": "icmp.log",
+	"Metrics": {
+		"EndpointPort": 2112,
+		"ServerCrtPath": "../../../../../server.crt",
+		"ServerKeyPath": "../../../../../server.key",
+		"PasswordChecksum": "b6af75935f91eb4eda447fda45424b1c3d6e07ea01f3fbafc094f2ee6eb78df7",
+		"UserNameChecksum": "1809f7cd0c75acf34f56d8c19782b99c6b5fcd14128a3cc79aca38a4f94af3ff",
+		"FilePath": "metrics.prom"
+	},
+	"AllNameServerIPs": true,
+	"TrustAllTLDs": false,
+	"TrustedZones": [ ".",  "com.", "net.", "org.", "root-servers.net." ],
+	"TrustedZoneNSCount": 2,
+	"DoNotScanList": "config/doNotScan.csv",
+	"Loglevel": "info",
+	"Logfile": "log.log",
+	"MaxCNAMEDepth": 64,
+	"GatherDNSSEC": true,
+	"Modules": [ ],
+	"QueryFor": {
+		"OnFullNameResolved": [
+			{
+				"Comment": "Query IPv4 addresses of domain",
+				"NameTemplate": "{name}",
+				"Type": 1,
+				"Class": 1,
+			},
+			{
+				"Comment": "Query IPv6 addresses of domain",
+				"NameTemplate": "{name}",
+				"Type": 28,
+				"Class": 1
+			},
+			{
+				"Comment": "Query TXT records of domain",
+				"NameTemplate": "{name}",
+				"Type": 16,
+				"Class": 1,
+			}
+		],
+		"OnZoneCreated": [
+			{
+				"Comment": "Query SOA records of zone",
+				"NameTemplate": "{zone}",
+				"Type": 6,
+				"Class": 1,
+			},
+			{
+				"Comment": "Query TXT records of zone",
+				"NameTemplate": "{name}",
+				"Type": 16,
+				"Class": 1,
+			},
+			{
+				"Comment": "Query MX records of zone",
+				"NameTemplate": "{zone}",
+				"Type": 15,
+				"Class": 1,
+				"DoNotFollow": true // Don't resolve mail server names
+			},
+			{
+				"Comment": "Query DNSKEY records of zone",
+				"NameTemplate": "{zone}",
+				"Type": 48,
+				"Class": 1,
+			},
+			{
+				"Comment": "Query DS records of zone.",
+				"NameTemplate": "{zone}",
+				"Type": 43,
+				"Class": 1,
+				"AskParent": true
+			},
+			{
+				"Comment": "Query CDNSKEY records of zone",
+				"NameTemplate": "{zone}",
+				"Type": 60,
+				"Class": 1,
+				"SkipRoot": true
+			},
+			{
+				"Comment": "Query CDS records of zone.",
+				"NameTemplate": "{zone}",
+				"Type": 59,
+				"Class": 1,
+				"SkipRoot": true
+			},
+			{
+				"Comment": "Query bind version records of name servers in zone",
+				"NameTemplate": "version.bind.",
+				"Type": 16,
+				"Class": 3,
+				// Many nameservers will terminate a TCP connection if they receive this query.
+				// This is interfering with the TCP connection pooling and reuse.
+				// Since there should be no truncation, TCP fallback is not necessary anyway.
+				"UDPOnly": true,
+
+				// Many nameservers will just not respond. No use in trying too often.
+				"MaxRetries": 1,
+				"DisableInfraCache": true
+			}
+		],
+	}
+}
