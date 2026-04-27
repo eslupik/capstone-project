@@ -2,15 +2,14 @@ import csv
 import random
 import subprocess
 from pathlib import Path
-from concurrent.futures import ThreadPoolExecutor, as_completed
 
 INPUT_FILE = "data_preprocess/root_domain.csv"
-OUTPUT_ACCEPTED = "data_preprocess/subfinder_candidates_10k.csv"
-OUTPUT_EXCLUDED = "data_preprocess/excluded_candidates_10k.csv"
+OUTPUT_ACCEPTED = "data_preprocess/subfinder_candidates.csv"
+OUTPUT_EXCLUDED = "data_preprocess/excluded_candidates.csv"
 
 NUM_ROOTS = 1800
 MAX_ACCEPTED_PER_ROOT = 10
-RANDOM_SEED = 13
+RANDOM_SEED = 5
 MAX_CANDIDATES_PER_ROOT = 500
 DIG_TIMEOUT = 20
 SUBFINDER_TIMEOUT = 200
@@ -51,7 +50,7 @@ def run_subfinder(domain: str):
             cmd,
             capture_output=True,
             text=True,
-            timeout=SUBFINDER_TIMEOUT,
+            timeout=200,
             check=False,
         )
     except subprocess.TimeoutExpired:
@@ -72,7 +71,7 @@ def run_subfinder(domain: str):
         names.append(name)
 
     random.shuffle(names)
-    return names[:MAX_CANDIDATES_PER_ROOT]
+    return names
 
 def dig_name(name: str):
     """
@@ -83,13 +82,13 @@ def dig_name(name: str):
         "resolved_value": ...
     }
     """
-    cmd = ["dig", name]
+    cmd_short=["dig", "+short", name]
     try:
         result = subprocess.run(
-            cmd,
+            cmd_short,
             capture_output=True,
             text=True,
-            timeout=DIG_TIMEOUT,
+            timeout=20,
             check=False,
         )
     except subprocess.TimeoutExpired:
@@ -98,9 +97,23 @@ def dig_name(name: str):
             "answer_type": "NONE",
             "resolved_value": "",
         }
-    full_output = result.stdout
+    cmd_complete = ["dig", name]
+    try:
+        status_result = subprocess.run(
+            cmd_complete,
+            capture_output=True,
+            text=True,
+            timeout=20,
+            check=False,
+        )
+        full_output = status_result.stdout
+    except subprocess.TimeoutExpired:
+        return {
+            "dns_status": "TIMEOUT",
+            "answer_type": "NONE",
+            "resolved_value": "",
+        }
     dns_status = "OTHER"
-
     for line in full_output.splitlines():
         line = line.strip()
         if "status:" in line:
@@ -108,58 +121,37 @@ def dig_name(name: str):
             if len(part) >= 2:
                 dns_status = part[1].split(",")[0].strip()
                 break
+    short_lines = []
+    for line in result.stdout.splitlines():
+        line = line.strip()
+        if line:
+            short_lines.append(line)
+
     if dns_status != "NOERROR":
         return {
             "dns_status": dns_status,
             "answer_type": "NONE",
             "resolved_value": "",
         }
-    in_answer_section = False
-    answer_lines = []
-    for line in full_output.splitlines():
-        line = line.strip()
-        if line.startswith(";; ANSWER SECTION:"):
-            in_answer_section = True
-            continue
-        if in_answer_section:
-            if line.startswith(";;") or not line:
-                break
-            answer_lines.append(line)
-
-    if not answer_lines:
+    if not short_lines:
         return {
-            "dns_status":dns_status,
+            "dns_status": dns_status,
             "answer_type": "NOANSWER",
             "resolved_value": "",
         }
-    first_answer = answer_lines[0]
-    parts = first_answer.split()
-    if len(parts) < 5:
-        return {
-            "dns_status": dns_status,
-            "answer_type": "UNKNOWN",
-            "resolved_value": "",
-        }
-    rr_type = parts[3]
-    resolved_value = parts[4].rstrip(".")
-    return {
+    first = short_lines[0]
+    if first.endswith("."):
+        answer_type = "CNAME"
+    elif ":" in first:
+        answer_type = "AAAA"
+    else:
+        answer_type = "A"
+    
+    return{
         "dns_status": dns_status,
-        "answer_type": rr_type,
-        "resolved_value": resolved_value,
+        "answer_type": answer_type,
+        "resolved_value": first,
     }
-
-def resolve_candidate(rank, root_domain, candidate):
-    dig_result = dig_name(candidate)
-    return {
-        "tranco_rank": rank,
-        "root_domain": root_domain,
-        "discovered_name": candidate,
-        "dns_status": dig_result["dns_status"],
-        "answer_type": dig_result["answer_type"],
-        "resolved_value": dig_result["resolved_value"],
-    }
-
-  
 
 def is_candidate_accepted(dig_result: dict):
     result = False
@@ -179,13 +171,9 @@ def append_row(filepath: str, fieldnames, row: dict):
     with open(filepath, "a", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writerow(row)
+    
 
-def write_rows(filepath: str, fieldnames, rows):
-    with open(filepath, "w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
-        writer.writeheader()
-        writer.writerows(rows)
-
+    
 
     
         
@@ -193,7 +181,7 @@ def write_rows(filepath: str, fieldnames, rows):
 
 
 def main():
-    fieldnames = [
+    accepted = [
         "tranco_rank",
         "root_domain",
         "discovered_name",
@@ -201,51 +189,43 @@ def main():
         "answer_type",
         "resolved_value",
     ]
+    excluded = [
+        "tranco_rank",
+        "root_domain",
+        "discovered_name",
+        "dns_status",
+        "answer_type",
+        "resolved_value",
+    ]
+    write_csv_header_if_needed(OUTPUT_ACCEPTED, accepted)
+    write_csv_header_if_needed(OUTPUT_EXCLUDED, excluded)
+
+
     rows = load_root_domains(INPUT_FILE)
     sampled_roots = sample_root_domains(rows, NUM_ROOTS, RANDOM_SEED)
-
-    all_accepted_rows = []
-    all_excluded_rows = []
 
     for idx, item in enumerate(sampled_roots, start=1):
         rank = item["tranco_rank"]
         root_domain = item["root_domain"]
         candidates = run_subfinder(root_domain)
         accepted_count = 0
-        accepted_rows_this_root = []
-        excluded_rows_this_root = []
-        for start in range(0, len(candidates), WAVE_SIZE):
+        for candidate in candidates:
             if accepted_count >= MAX_ACCEPTED_PER_ROOT:
                 break
-            batch = candidates[start:start + WAVE_SIZE]
-
-            with ThreadPoolExecutor(max_workers=DIG_THREADS_PER_ROOT) as executor:
-                futures = [
-                    executor.submit(resolve_candidate, rank, root_domain, candidate)
-                    for candidate in batch
-                ]
-                for future in as_completed(futures):
-                    row = future.result()
-                    dig_result = {
-                        "dns_status": row["dns_status"],
-                        "answer_type": row["answer_type"],
-                        "resolved_value": row["resolved_value"],
-                    }
-                    if is_candidate_accepted(dig_result) and accepted_count < MAX_ACCEPTED_PER_ROOT:
-                        accepted_rows_this_root.append(row)
-                        accepted_count += 1
-                    else:
-                        excluded_rows_this_root.append(row)
-        all_accepted_rows.extend(accepted_rows_this_root)
-        all_excluded_rows.extend(excluded_rows_this_root)
-        print(
-            f"[{idx}/{len(sampled_roots)}] {root_domain} | "
-            f"candidates={len(candidates)} | accepted={accepted_count}"
-        )
-    write_rows(OUTPUT_ACCEPTED, fieldnames, all_accepted_rows)
-    write_rows(OUTPUT_EXCLUDED, fieldnames, all_excluded_rows)
-
-
-
+            dig_result = dig_name(candidate)
+            base_row = {
+                "tranco_rank": rank,
+                "root_domain": root_domain,
+                "discovered_name": candidate,
+                "dns_status": dig_result["dns_status"],
+                "answer_type": dig_result["answer_type"],
+                "resolved_value": dig_result["resolved_value"],
+            }
+            if is_candidate_accepted(dig_result):
+                append_row(OUTPUT_ACCEPTED, accepted, base_row)
+                accepted_count += 1
+            else:
+                append_row(OUTPUT_EXCLUDED, excluded, base_row)
+        print(f"[{idx}/{len(sampled_roots)}] {root_domain} | candidates={len(candidates)} | accepted={accepted_count}")
 if __name__ == "__main__":
     main()
