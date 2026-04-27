@@ -2,7 +2,7 @@ rev=$(shell git rev-parse --short HEAD)
 date=$(shell date +%F-%H-%M)
 runDir=${date}_${rev}
 
-outSubDir = Output_10_DN
+outSubDir = Output_3145_DN
 configSubDir = capstone_config
 inputFile = subfinder_example_500.csv
 inputLen = 500
