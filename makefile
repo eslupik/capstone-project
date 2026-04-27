@@ -2,7 +2,7 @@ rev=$(shell git rev-parse --short HEAD)
 date=$(shell date +%F-%H-%M)
 runDir=${date}_${rev}
 
-outSubDir = Output_5101_DN
+outSubDir = Output_10_DN
 configSubDir = capstone_config
 inputFile = subfinder_example_500.csv
 inputLen = 500
@@ -46,8 +46,8 @@ run_scan: build
 	find ${folder}/data -type f -name 'output_*.zst' | parallel --jobs ${jobs} --plus ${CURDIR}/yodns/yodns/yodns convertFormat --in={} --out=${folder}/json/{/..}.json.zst --zip "zst"
 	
 	
-# This runs a test of the capstone YoDNS configuration
-# The experiment includes a scan, validation of the results, and (optionally) converts the output files to json format for visual inspection.
+# This runs the capstone YoDNS configuration
+# This includes the FILTERING of YoDNS results portion to extract only relevant records for identifying stale glue records, removing uneccessary information
 filter_results: build 
 
 	# Ensure relevant output folder exists!
@@ -61,12 +61,12 @@ filter_results: build
 	#Output Filtering:
 
 	# Get authorized A and AAAA records
-	find ${folder}/data -type f -name 'output_*.zst' | parallel --jobs ${jobs} --plus ${CURDIR}/yodns/yodns/yodns extractMessagesCapstone --in={}  --out=${folder}/filtered/Auth/A_REC/{/..}_Auth_A_REC.json.zst --zip "zst" --aa --qtype=1 --rtype=1
-	find ${folder}/data -type f -name 'output_*.zst' | parallel --jobs ${jobs} --plus ${CURDIR}/yodns/yodns/yodns extractMessagesCapstone --in={} --out=${folder}/filtered/Auth/AAAA_REC/{/..}_Auth_AAAA_REC.json.zst --zip "zst" --aa --qtype=28 --rtype=28
+	find ${folder}/data -type f -name 'output_*.zst' | parallel --jobs ${jobs} --plus ${CURDIR}/yodns/yodns/yodns extractMessagesCapstone --in={}  --out=${folder}/filtered/Auth/A_REC/{/..}_Auth_A_REC.json  --aa --qtype=1 --rtype=1
+	find ${folder}/data -type f -name 'output_*.zst' | parallel --jobs ${jobs} --plus ${CURDIR}/yodns/yodns/yodns extractMessagesCapstone --in={} --out=${folder}/filtered/Auth/AAAA_REC/{/..}_Auth_AAAA_REC.json  --aa --qtype=28 --rtype=28
 	
 	#Get A and AAAA glue records for NS queries
-	find ${folder}/data -type f -name 'output_*.zst' | parallel --jobs ${jobs} --plus ${CURDIR}/yodns/yodns/yodns extractMessagesCapstone --in={} --out=${folder}/filtered/Glue/A_Glue/{/..}_A_Glue.json.zst --zip "zst" --glue-only=true --qtype=2 --rtype=2 --glue-type=1
-	find ${folder}/data -type f -name 'output_*.zst' | parallel --jobs ${jobs} --plus ${CURDIR}/yodns/yodns/yodns extractMessagesCapstone --in={} --out=${folder}/filtered/Glue/AAAA_Glue/{/..}_AAAA_Glue.json.zst --zip "zst" --glue-only=true --qtype=2 --rtype=2 --glue-type=1
+	find ${folder}/data -type f -name 'output_*.zst' | parallel --jobs ${jobs} --plus ${CURDIR}/yodns/yodns/yodns extractMessagesCapstone --in={} --out=${folder}/filtered/Glue/A_Glue/{/..}_A_Glue.json  --glue-only=true --qtype=2 --rtype=2 --glue-type=1
+	find ${folder}/data -type f -name 'output_*.zst' | parallel --jobs ${jobs} --plus ${CURDIR}/yodns/yodns/yodns extractMessagesCapstone --in={} --out=${folder}/filtered/Glue/AAAA_Glue/{/..}_AAAA_Glue.json  --glue-only=true --qtype=2 --rtype=2 --glue-type=28
 
 
 #The old way of doing things...
