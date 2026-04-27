@@ -4,11 +4,11 @@ from pprint import pprint
 from typing import Final
 
 
-num_dns = '10'
+num_dns = '5101'
 NUM_DNs: Final[str] = num_dns
 
-AUTH: Final[int] = 1
-GLUE: Final[int] = 2 
+AUTH_MESSAGE: Final[str] = 'Answer'
+GLUE_MESSAGE: Final[str] = 'GlueRecords' 
 #Finding relevant file paths to access json files for parsing
 BASE_DIR: Final[Path] = Path(__file__).resolve().parent.parent / 'YoDNS_output'/ f'Output_{NUM_DNs}_DN' / 'filtered'
 
@@ -20,53 +20,43 @@ GLUE_AAAA_DIR: Final[Path] = BASE_DIR / 'Glue' / 'AAAA_Glue'
 
 
 
-def load_json_file(filepath: Path):
-    '''Loads data from all json files in a folder into an array for processing
-    (warning, need to put every line of the yodns output files as an array entry or it cannot be loaded)'''
+def load_json_file(filepath: Path, message_type: str):
+    '''Loads relevant data from all json files in a folder into an dictionary of a specified type 
+    (authoritative or glue) for analysis'''
 
     json_files = list(Path.glob(filepath, "*.json"))
     #print(json_files)
 
-    data = []
-
-    for file in json_files:
-        # Open and load the JSON file (these two lines were taken from Gemini)
-        with open(file) as f:
-
-            data.append(json.load(f))
-            #pprint(data)
-
-    return data
-
-
-def process_json(auth_data: list, type: int):
-    '''Processes the contents of a json file containing records (glue or authoritative) and creates a 
-    dictionary mapping domain names (keys, strings) to  records (values, a set of strings)'''
-
-    message = ''
-    if type == AUTH:
-        message = 'Answer'
-    else:
-        message = 'GlueRecords'
-
-    
     rec_dict = {}
 
-    for line in auth_data:
-
-        for entry in line:
-            answer = entry[message]
-
-            for record in answer:
-                DN = record['Name']
-
-                if DN not in rec_dict:
-                    rec_dict[DN] = set()
-                
-                rec_dict[DN].add(record['Value'])
+    for file in json_files:
+        # Open and load the JSON file
+        with open(file, 'r') as f: 
+        #(Gemini was used for this code to create this inner loop because I wasn't fully sure how to parse json objects)
+            for line in f:
+                # Each line is a complete, valid JSON object
+                entry = json.loads(line)
+                #pprint(entry)
+                process_json(rec_dict, entry, message_type)
 
     #pprint(rec_dict)
     return rec_dict
+
+
+def process_json(rec_dict: dict, entry: dict, message_type: str):
+    '''Processes the contents of a json file containing records (glue or authoritative) and creates a 
+    dictionary mapping domain names (keys, strings) to  records (values, a set of strings)'''
+
+    answer = entry[message_type]
+
+    for record in answer:
+        DN = record['Name']
+
+        if DN not in rec_dict:
+            rec_dict[DN] = set()
+        
+        rec_dict[DN].add(record['Value'])
+    #pprint(rec_dict)
 
 
 def compare_recs(auth_dict: dict, glue_dict: dict):
@@ -89,40 +79,19 @@ def compare_recs(auth_dict: dict, glue_dict: dict):
     pprint(inconsistent_dict)
     return inconsistent_dict
 
-                
-                    
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 def main():
 
     #For A (Ipv4) records:
-    auth_A_data = load_json_file(AUTH_A_DIR)
-    auth_A_dict = process_json(auth_A_data, AUTH)
-
-    glue_A_data = load_json_file(GLUE_A_DIR)
-    glue_A_dict = process_json(glue_A_data, GLUE)
-
+    auth_A_dict = load_json_file(AUTH_A_DIR, AUTH_MESSAGE)
+    glue_A_dict = load_json_file(GLUE_A_DIR, GLUE_MESSAGE)
+    #Identify inconsistent glue A records (not present in authorized records)
     inconsistent_A_glue = compare_recs(auth_A_dict, glue_A_dict)
 
     #For AAAA (Ipv6) records:
-    auth_AAAA_data = load_json_file(AUTH_AAAA_DIR)
-    auth_AAAA_dict = process_json(auth_AAAA_data, AUTH)
-
-    glue_AAAA_data = load_json_file(GLUE_AAAA_DIR)
-    glue_AAAA_dict = process_json(glue_AAAA_data, GLUE)
-
+    auth_AAAA_dict = load_json_file(AUTH_AAAA_DIR, AUTH_MESSAGE)
+    glue_AAAA_dict = load_json_file(GLUE_AAAA_DIR, GLUE_MESSAGE)
+    #Identify inconsistent glue AAAA records (not present in authorized records)
     inconsistent_AAAA_glue = compare_recs(auth_AAAA_dict, glue_AAAA_dict)
 
     
