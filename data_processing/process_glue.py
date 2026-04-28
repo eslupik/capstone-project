@@ -1,16 +1,26 @@
+import argparse
 import json
 from pathlib import Path
 from pprint import pprint
 from typing import Final
+import dns.resolver
+import csv_helpers
 
 
-num_dns = '9295'
-NUM_DNs: Final[str] = num_dns
+#Argument parser code is modified from Gemini
+parser = argparse.ArgumentParser(description="Processes glue and authoritative A and AAAA records to identify stale glue records") 
+    
+# Add positional (required) arguments
+parser.add_argument("Num_DNs", help="The number of domain names run through YoDNS, used to identify the correct output folder", type=int)
+args = parser.parse_args()
+
+#FINAL VARIABLES__________________________________________________________________________________________________
+NUM_DNS: Final[str] = str(args.Num_DNs)
 
 AUTH_MESSAGE: Final[str] = 'Answer'
 GLUE_MESSAGE: Final[str] = 'GlueRecords' 
 #Finding relevant file paths to access json files for parsing
-BASE_DIR: Final[Path] = Path(__file__).resolve().parent.parent / 'YoDNS_output'/ f'Output_{NUM_DNs}_DN' / 'filtered'
+BASE_DIR: Final[Path] = Path(__file__).resolve().parent.parent / 'YoDNS_output'/ f'Output_{NUM_DNS}_DN' / 'filtered'
 
 AUTH_A_DIR: Final[Path] = BASE_DIR / 'Auth' / 'A_REC'
 GLUE_A_DIR: Final[Path] = BASE_DIR / 'Glue' / 'A_Glue'
@@ -18,7 +28,8 @@ GLUE_A_DIR: Final[Path] = BASE_DIR / 'Glue' / 'A_Glue'
 AUTH_AAAA_DIR: Final[Path] = BASE_DIR / 'Auth' / 'AAAA_REC'
 GLUE_AAAA_DIR: Final[Path] = BASE_DIR / 'Glue' / 'AAAA_Glue'
 
-
+OUTPUT_DIR: Final[Path] = Path(__file__).resolve().parent.parent / 'YoDNS_output'/ f'Output_{NUM_DNS}_DN' / 'results' / 'stale_glue' / f'Inconsistenst_IPs-{NUM_DNS}.csv'
+INCON_HEADERS: Final[list[str]] = ['Domain Name', 'Inconsistent IPs', 'IP Record Type']
 
 def load_json_file(filepath: Path, message_type: str):
     '''Loads relevant data from all json files in a folder into an dictionary of a specified type 
@@ -76,12 +87,66 @@ def compare_recs(auth_dict: dict, glue_dict: dict):
         if not inconsistent_dict[DN]:
             inconsistent_dict.pop(DN)
 
-    pprint(inconsistent_dict)
+    #pprint(inconsistent_dict)
     return inconsistent_dict
+
+
+#This function (with modifications) was created by Gemini
+def is_stale(dns_ip, ns_hostname, rec_type):
+    resolver = dns.resolver.Resolver(configure=False)
+    resolver.nameservers = [dns_ip]  # Direct the query to your old IP
+    resolver.timeout = 2             # How long to wait for a response
+    resolver.lifetime = 2
+
+    try:
+        answer = resolver.resolve(ns_hostname, rec_type)
+        rev_answer = dns.resolver.resolve_address(dns_ip)
+        
+        A_recs = [addr.to_text() for addr in answer]
+        ns_names = [rr.target.to_text() for rr in rev_answer]
+
+        if dns_ip in A_recs or ns_hostname in ns_names:
+            #print(f"Success! A_recs found: {A_recs}\n Reverse lookup response: for {ns_hostname}: {ns_names}.")
+            return False
+        else:
+            #print("Nah")
+            return True
+    except (dns.resolver.NoNameservers, dns.resolver.Timeout):
+        #print(f"Failed: {dns_ip} is unresponsive.")
+        return True
+    except Exception as e:
+        #print(f"Error checking {dns_ip}: {e}")
+        return True
+
+
+
+def lookup_inconsistent(A_glue: dict, AAAA_glue: dict):
+    '''Takes dicts of identified inconsistent glue records and performs NS lookups on these IPs to determine if they are stale'''
+    lookup_dict = {}
+
+    ddicts = {'A': A_glue, 'AAAA': AAAA_glue}
+
+    for rec_type, rec_dict in ddicts.items():
+
+        for DN, IPset in rec_dict.items():
+
+            for IP in IPset:
+                if is_stale(IP, DN, rec_type):
+                    #To-do
+                    lookup_dict[IP] = DN
+
+
+
+                
+
+    return lookup_dict
+
+
 
 
 def main():
 
+    
     #For A (Ipv4) records:
     auth_A_dict = load_json_file(AUTH_A_DIR, AUTH_MESSAGE)
     glue_A_dict = load_json_file(GLUE_A_DIR, GLUE_MESSAGE)
@@ -93,6 +158,14 @@ def main():
     glue_AAAA_dict = load_json_file(GLUE_AAAA_DIR, GLUE_MESSAGE)
     #Identify inconsistent glue AAAA records (not present in authorized records)
     inconsistent_AAAA_glue = compare_recs(auth_AAAA_dict, glue_AAAA_dict)
+
+    #Write identified inconsistent glue records to a csv file
+    csv_helpers.write_csv(inconsistent_A_glue, inconsistent_AAAA_glue, OUTPUT_DIR, INCON_HEADERS)
+
+    lookup_dict = lookup_inconsistent(inconsistent_A_glue, inconsistent_AAAA_glue)
+
+    
+    
 
     
 

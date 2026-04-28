@@ -2,17 +2,19 @@ rev=$(shell git rev-parse --short HEAD)
 date=$(shell date +%F-%H-%M)
 runDir=${date}_${rev}
 
-outSubDir = Output_9295_DN
+#General parameters: please change for every test
+Num_DNs = 9295
 
-# Scan parameters (the only parameter change that must occur within the config json file is "ParallelFiles")
+# Scan parameters: check before running the scan commands
 configSubDir = capstone_config
-inputFile = subfinder_candidates_9296.csv
+inputFile = subfinder_candidates_${Num_DNs}.csv
 inputLen = 10000
 parallelFiles = 30
 
 configDir = config
 outputDir = YoDNS_output
 
+outSubDir = Output_${Num_DNs}_DN
 folder = ${outputDir}/${outSubDir}
 config = ${configDir}/${configSubDir}
 
@@ -53,8 +55,6 @@ run_scan: build
 # This includes the FILTERING of YoDNS results portion to extract only relevant records for identifying stale glue records, removing uneccessary information
 filter_results: build 
 
-	# Ensure relevant output folder exists!
-	mkdir -p ${folder}/data 
 	# Create organized folders for filtered output
 	mkdir -p ${folder}/filtered/Auth/A_REC ${folder}/filtered/Auth/AAAA_REC ${folder}/filtered/NS ${folder}/filtered/Glue/A_Glue  ${folder}/filtered/Glue/AAAA_Glue ${folder}/bucketized
 
@@ -70,6 +70,18 @@ filter_results: build
 	#Get A and AAAA glue records for NS queries
 	find ${folder}/data -type f -name 'output_*.zst' | parallel --jobs ${jobs} --plus ${CURDIR}/yodns/yodns/yodns extractMessagesCapstone --in={} --out=${folder}/filtered/Glue/A_Glue/{/..}_A_Glue.json  --glue-only=true --qtype=2 --rtype=2 --glue-type=1
 	find ${folder}/data -type f -name 'output_*.zst' | parallel --jobs ${jobs} --plus ${CURDIR}/yodns/yodns/yodns extractMessagesCapstone --in={} --out=${folder}/filtered/Glue/AAAA_Glue/{/..}_AAAA_Glue.json  --glue-only=true --qtype=2 --rtype=2 --glue-type=28
+
+
+# This runs the capstone YoDNS configuration
+# This includes the ANALYSIS of YoDNS results portion to process relevant records for identifying stale glue records
+analyze_results: build 
+
+	# Create output folders for analyzed data
+	mkdir -p ${folder}/results/stale_glue  ${folder}/results/dangling_CNAMEs 
+
+	# Process filtered auth and glue record json files to identify stale glue records
+	python3 ${CURDIR}/data_processing/process_glue.py ${Num_DNs}
+
 
 
 #The old way of doing things...
