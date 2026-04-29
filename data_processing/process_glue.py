@@ -19,6 +19,9 @@ NUM_DNS: Final[str] = str(args.Num_DNs)
 
 AUTH_MESSAGE: Final[str] = 'Answer'
 GLUE_MESSAGE: Final[str] = 'GlueRecords' 
+A_TYPE: Final[int] = 1
+AAAA_TYPE: Final[int] = 28
+
 #Finding relevant file paths to access json files for parsing
 BASE_DIR: Final[Path] = Path(__file__).resolve().parent.parent / 'YoDNS_output'/ f'Output_{NUM_DNS}_DN' / 'filtered'
 
@@ -65,20 +68,22 @@ def process_json(rec_dict: dict, entry: dict, glue_ct_dict: dict, message_type: 
     answer = entry[message_type]
 
     for record in answer:
-        
-        DN = record['Name']
-        IP = record['Value']
+        #Filter out answer signatures/other record types within the answer resource records
+        if record['Type'] in [A_TYPE, AAAA_TYPE]: 
 
-        glue_ct += 1
+            DN = record['Name']
+            IP = record['Value']
 
-        if DN not in rec_dict:
-            rec_dict[DN] = set()
-        
-        rec_dict[DN].add(IP)
+            glue_ct += 1
 
-        if message_type == GLUE_MESSAGE:
-            #Keep track of the number of glue records found for each IP to estimate proportions of stalee glue records encountered by YoDNS
-            update_ct(glue_ct_dict, IP) 
+            if DN not in rec_dict:
+                rec_dict[DN] = set()
+            
+            rec_dict[DN].add(IP)
+
+            if message_type == GLUE_MESSAGE:
+                #Keep track of the number of glue records found for each IP to estimate proportions of stalee glue records encountered by YoDNS
+                update_ct(glue_ct_dict, IP)
 
     #pprint(rec_dict)
     return glue_ct
@@ -156,28 +161,40 @@ def lookup_inconsistent(A_glue: dict, AAAA_glue: dict):
             for IP in IPset:
                 if not is_stale(IP, DN, rec_type):
                     rec_dict[DN].remove(IP)
+                    print("IP removed!")
 
             if not rec_dict[DN]:
                 rec_dict.pop(DN)
 
     #return lookup_dict
 
+def calc_total_stale(stale_dict: dict, ct_dict: dict):
 
+    total_stale = 0
+    unique_stale = 0
+
+    for DN, IPset in stale_dict.items():
+
+        for IP in IPset:
+
+            unique_stale += 1
+            total_stale += ct_dict[IP]
+
+    return total_stale, unique_stale
 
 
 def main():
 
     
     #For A (Ipv4) records:
-    auth_A_dict, _ , _ = load_json_file(AUTH_A_DIR, AUTH_MESSAGE)
-    pprint(auth_A_dict)
-    glue_A_dict, glue_ct_dict, total_glue = load_json_file(GLUE_A_DIR, GLUE_MESSAGE)
+    auth_A_dict = load_json_file(AUTH_A_DIR, AUTH_MESSAGE)[0]
+    glue_A_dict, glue_A_ct_dict, total_A_glue = load_json_file(GLUE_A_DIR, GLUE_MESSAGE)
     #Identify inconsistent glue A records (not present in authorized records)
     inconsistent_A_glue = compare_recs(auth_A_dict, glue_A_dict)
 
     #For AAAA (Ipv6) records:
-    auth_AAAA_dict = load_json_file(AUTH_AAAA_DIR, AUTH_MESSAGE)
-    glue_AAAA_dict = load_json_file(GLUE_AAAA_DIR, GLUE_MESSAGE)
+    auth_AAAA_dict = load_json_file(AUTH_AAAA_DIR, AUTH_MESSAGE)[0]
+    glue_AAAA_dict, glue_AAAA_ct_dict, total_AAAA_glue = load_json_file(GLUE_AAAA_DIR, GLUE_MESSAGE)
     #Identify inconsistent glue AAAA records (not present in authorized records)
     inconsistent_AAAA_glue = compare_recs(auth_AAAA_dict, glue_AAAA_dict)
 
@@ -186,8 +203,20 @@ def main():
 
     lookup_inconsistent(inconsistent_A_glue, inconsistent_AAAA_glue)
 
-    pprint(inconsistent_A_glue)
-    pprint(inconsistent_AAAA_glue)
+    # pprint(inconsistent_A_glue)
+    # pprint(glue_A_ct_dict)
+    # print(total_A_glue)
+    # pprint(inconsistent_AAAA_glue)
+
+    total_stale_A, unique_stale_A = calc_total_stale(inconsistent_A_glue, glue_A_ct_dict)
+    percent_stale_A = round((float(total_stale_A)/total_A_glue)*100, 2)
+
+    total_stale_AAAA, unique_stale_AAAA = calc_total_stale(inconsistent_AAAA_glue, glue_AAAA_ct_dict)
+    percent_stale_AAAA = round((float(total_stale_AAAA)/total_AAAA_glue)*100, 2)
+
+    print(f"Total stale A recs: {total_stale_A}/{total_A_glue} ({percent_stale_A}), {unique_stale_A} unique stale IPs from {len(inconsistent_A_glue)} NS names.")
+    print(f"Total stale AAAA recs: {total_stale_AAAA}/{total_AAAA_glue} ({percent_stale_AAAA}), {unique_stale_AAAA} unique stale IPs from {len(inconsistent_AAAA_glue)} NS names.")
+    
     
     
 

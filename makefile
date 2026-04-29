@@ -70,6 +70,7 @@ filter_results: build
 	#Get A and AAAA glue records for NS queries
 	find ${folder}/data -type f -name 'output_*.zst' | parallel --jobs ${jobs} --plus ${CURDIR}/yodns/yodns/yodns extractMessagesCapstone --in={} --out=${folder}/filtered/Glue/A_Glue/{/..}_A_Glue.json  --glue-only=true --qtype=2 --rtype=2 --glue-type=1
 	find ${folder}/data -type f -name 'output_*.zst' | parallel --jobs ${jobs} --plus ${CURDIR}/yodns/yodns/yodns extractMessagesCapstone --in={} --out=${folder}/filtered/Glue/AAAA_Glue/{/..}_AAAA_Glue.json  --glue-only=true --qtype=2 --rtype=2 --glue-type=28
+
 filter_results_CNAME: build
 	# Create organized folders for filtered output
 	mkdir -p ${folder}/filtered/CNAME_REC
