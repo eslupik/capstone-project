@@ -74,9 +74,16 @@ filter_results_CNAME: build
 	# Create organized folders for filtered output
 	mkdir -p ${folder}/filtered/CNAME_REC
 
-	# Get authorized CNAME records
-	find ${folder}/data -type f -name 'output_*.zst' | parallel --jobs ${jobs} --plus ${CURDIR}/yodns/yodns/yodns extractMessagesCapstone --in={}  --out=${folder}/filtered/CNAME_REC/{/..}_CNAME_REC.json  --aa --rtype=5
-	
+	# Get authoritative CNAME records
+	@for f in ${folder}/data/output_*.zst; do \
+		[ -e "$$f" ] || { echo "No input files found in ${folder}/data"; exit 1; }; \
+		base=$$(basename "$$f" .pb.zst); \
+		${CURDIR}/yodns/yodns/yodns extractMessagesCapstone \
+			--in="$$f" \
+			--out="${folder}/filtered/CNAME_REC/$${base}_CNAME_REC.json" \
+			--aa \
+			--rtype=5; \
+	done
 # This runs the capstone YoDNS configuration
 # This includes the ANALYSIS of YoDNS results portion to process relevant records for identifying stale glue records
 analyze_results: build 
