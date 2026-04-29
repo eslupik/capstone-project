@@ -31,6 +31,7 @@ GLUE_AAAA_DIR: Final[Path] = BASE_DIR / 'Glue' / 'AAAA_Glue'
 OUTPUT_DIR: Final[Path] = Path(__file__).resolve().parent.parent / 'YoDNS_output'/ f'Output_{NUM_DNS}_DN' / 'results' / 'stale_glue' / f'Inconsistenst_IPs-{NUM_DNS}.csv'
 INCON_HEADERS: Final[list[str]] = ['Domain Name', 'Inconsistent IPs', 'IP Record Type']
 
+#FUNCTIONS_______________________________________________________________________________________________________
 def load_json_file(filepath: Path, message_type: str):
     '''Loads relevant data from all json files in a folder into an dictionary of a specified type 
     (authoritative or glue) for analysis'''
@@ -39,6 +40,8 @@ def load_json_file(filepath: Path, message_type: str):
     #pprint(json_files)
 
     rec_dict = {}
+    glue_ct_dict = {}
+    total_glue = 0
 
     for file in json_files:
         # Open and load the JSON file
@@ -48,26 +51,46 @@ def load_json_file(filepath: Path, message_type: str):
                 # Each line is a complete, valid JSON object
                 entry = json.loads(line)
                 #pprint(entry)
-                process_json(rec_dict, entry, message_type)
+                total_glue += process_json(rec_dict, entry, glue_ct_dict, message_type)
 
     #pprint(rec_dict)
-    return rec_dict
+    return rec_dict, glue_ct_dict, total_glue
 
 
-def process_json(rec_dict: dict, entry: dict, message_type: str):
+def process_json(rec_dict: dict, entry: dict, glue_ct_dict: dict, message_type: str):
     '''Processes the contents of a json file containing records (glue or authoritative) and creates a 
     dictionary mapping domain names (keys, strings) to  records (values, a set of strings)'''
-
+    
+    glue_ct = 0
     answer = entry[message_type]
 
     for record in answer:
+        
         DN = record['Name']
+        IP = record['Value']
+
+        glue_ct += 1
 
         if DN not in rec_dict:
             rec_dict[DN] = set()
         
-        rec_dict[DN].add(record['Value'])
+        rec_dict[DN].add(IP)
+
+        if message_type == GLUE_MESSAGE:
+            #Keep track of the number of glue records found for each IP to estimate proportions of stalee glue records encountered by YoDNS
+            update_ct(glue_ct_dict, IP) 
+
     #pprint(rec_dict)
+    return glue_ct
+
+
+def update_ct(ct_dict: dict, IP: str):
+    '''Increments the frequency count recording glue records for each IP (A or AAAA record)'''
+
+    if IP in ct_dict:
+        ct_dict[IP] += 1
+    else:
+        ct_dict[IP] = 1
 
 
 def compare_recs(auth_dict: dict, glue_dict: dict):
@@ -100,16 +123,16 @@ def is_stale(dns_ip, ns_hostname, rec_type):
 
     try:
         answer = resolver.resolve(ns_hostname, rec_type)
-        rev_answer = dns.resolver.resolve_address(dns_ip)
+        #rev_answer = dns.resolver.resolve_address(dns_ip)
         
         A_recs = [addr.to_text() for addr in answer]
-        ns_names = [rr.target.to_text() for rr in rev_answer]
+        #ns_names = [rr.target.to_text() for rr in rev_answer]
 
-        if dns_ip in A_recs or ns_hostname in ns_names:
-            #print(f"Success! A_recs found: {A_recs}\n Reverse lookup response: for {ns_hostname}: {ns_names}.")
+        if dns_ip in A_recs:
+            #print(f"Glue still works! A_recs found: {A_recs}\n Reverse lookup response: for {ns_hostname}: {ns_names}.")
             return False
         else:
-            #print("Nah")
+            #print("Nah, glue is stale")
             return True
     except (dns.resolver.NoNameservers, dns.resolver.Timeout):
         #print(f"Failed: {dns_ip} is unresponsive.")
@@ -122,7 +145,7 @@ def is_stale(dns_ip, ns_hostname, rec_type):
 
 def lookup_inconsistent(A_glue: dict, AAAA_glue: dict):
     '''Takes dicts of identified inconsistent glue records and performs NS lookups on these IPs to determine if they are stale'''
-    lookup_dict = {}
+    #lookup_dict = {}
 
     ddicts = {'A': A_glue, 'AAAA': AAAA_glue}
 
@@ -131,15 +154,13 @@ def lookup_inconsistent(A_glue: dict, AAAA_glue: dict):
         for DN, IPset in rec_dict.items():
 
             for IP in IPset:
-                if is_stale(IP, DN, rec_type):
-                    #To-do
-                    lookup_dict[IP] = DN
+                if not is_stale(IP, DN, rec_type):
+                    rec_dict[DN].remove(IP)
 
+            if not rec_dict[DN]:
+                rec_dict.pop(DN)
 
-
-                
-
-    return lookup_dict
+    #return lookup_dict
 
 
 
@@ -148,8 +169,9 @@ def main():
 
     
     #For A (Ipv4) records:
-    auth_A_dict = load_json_file(AUTH_A_DIR, AUTH_MESSAGE)
-    glue_A_dict = load_json_file(GLUE_A_DIR, GLUE_MESSAGE)
+    auth_A_dict, _ , _ = load_json_file(AUTH_A_DIR, AUTH_MESSAGE)
+    pprint(auth_A_dict)
+    glue_A_dict, glue_ct_dict, total_glue = load_json_file(GLUE_A_DIR, GLUE_MESSAGE)
     #Identify inconsistent glue A records (not present in authorized records)
     inconsistent_A_glue = compare_recs(auth_A_dict, glue_A_dict)
 
@@ -162,8 +184,10 @@ def main():
     #Write identified inconsistent glue records to a csv file
     csv_helpers.write_csv(inconsistent_A_glue, inconsistent_AAAA_glue, OUTPUT_DIR, INCON_HEADERS)
 
-    lookup_dict = lookup_inconsistent(inconsistent_A_glue, inconsistent_AAAA_glue)
+    lookup_inconsistent(inconsistent_A_glue, inconsistent_AAAA_glue)
 
+    pprint(inconsistent_A_glue)
+    pprint(inconsistent_AAAA_glue)
     
     
 

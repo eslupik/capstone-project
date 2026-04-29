@@ -2,7 +2,7 @@ rev=$(shell git rev-parse --short HEAD)
 date=$(shell date +%F-%H-%M)
 runDir=${date}_${rev}
 
-#General parameters: please change for every test
+# General parameters: please change for every test
 Num_DNs = 9295
 
 # Scan parameters: check before running the scan commands
