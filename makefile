@@ -3,7 +3,7 @@ date=$(shell date +%F-%H-%M)
 runDir=${date}_${rev}
 
 # General parameters: please change for every test
-Num_DNs = 9295
+Num_DNs = 5099
 
 # Scan parameters: check before running the scan commands
 configSubDir = capstone_config
@@ -56,20 +56,18 @@ run_scan: build
 filter_results: build 
 
 	# Create organized folders for filtered output
-	mkdir -p ${folder}/filtered/Auth/A_REC ${folder}/filtered/Auth/AAAA_REC ${folder}/filtered/NS ${folder}/filtered/Glue/A_Glue  ${folder}/filtered/Glue/AAAA_Glue ${folder}/bucketized
+	mkdir -p ${folder}/filtered/Auth/A_REC ${folder}/filtered/Auth/AAAA_REC ${folder}/filtered/NS ${folder}/filtered/Glue/A_Glue  ${folder}/filtered/Glue/AAAA_Glue 
 
-	#Output grouping (bucketize by zone?? Currently doesn't work, don't uncomment)
-	# find ${folder}/filtered/Auth/A_REC -type f -name 'output_*.json' | parallel --jobs ${jobs} --plus ${CURDIR}/yodns/yodns/yodns bucketize --in={} --out=${folder}/bucketized --key=zone --buckets=10
-	
 	#Output Filtering:
 
 	# Get authorized A and AAAA records
 	find ${folder}/data -type f -name 'output_*.zst' | parallel --jobs ${jobs} --plus ${CURDIR}/yodns/yodns/yodns extractMessagesCapstone --in={}  --out=${folder}/filtered/Auth/A_REC/{/..}_Auth_A_REC.json  --aa --qtype=1 --rtype=1
 	find ${folder}/data -type f -name 'output_*.zst' | parallel --jobs ${jobs} --plus ${CURDIR}/yodns/yodns/yodns extractMessagesCapstone --in={} --out=${folder}/filtered/Auth/AAAA_REC/{/..}_Auth_AAAA_REC.json  --aa --qtype=28 --rtype=28
 	
-	#Get A and AAAA glue records for NS queries
+	# Get A and AAAA glue records for NS queries
 	find ${folder}/data -type f -name 'output_*.zst' | parallel --jobs ${jobs} --plus ${CURDIR}/yodns/yodns/yodns extractMessagesCapstone --in={} --out=${folder}/filtered/Glue/A_Glue/{/..}_A_Glue.json  --glue-only=true --qtype=2 --rtype=2 --glue-type=1
 	find ${folder}/data -type f -name 'output_*.zst' | parallel --jobs ${jobs} --plus ${CURDIR}/yodns/yodns/yodns extractMessagesCapstone --in={} --out=${folder}/filtered/Glue/AAAA_Glue/{/..}_AAAA_Glue.json  --glue-only=true --qtype=2 --rtype=2 --glue-type=28
+
 
 filter_results_CNAME: build
 	# Create organized folders for filtered output
@@ -85,6 +83,8 @@ filter_results_CNAME: build
 			--aa \
 			--rtype=5; \
 	done
+
+
 # This runs the capstone YoDNS configuration
 # This includes the ANALYSIS of YoDNS results portion to process relevant records for identifying stale glue records
 analyze_results: build 
@@ -115,6 +115,7 @@ extract_messages: build
 	#Get NS records
 	find ${folder}/data -type f -name 'output_*.zst' | parallel --jobs ${jobs} --plus ${CURDIR}/yodns/yodns/yodns extractMessages --in={} --out=${folder}/extracted/NS/{/..}_NS_REC.json.zst --zip "zst" --qtype=2 --rtype=2
 
+
 # This runs a test of the capstone YoDNS configuration
 # The experiment includes a scan, validation of the results, and (optionally) converts the output files to json format for visual inspection.
 capstone_test: build 
@@ -130,6 +131,8 @@ capstone_test: build
 	find ${outputDir}/capstone_test/data -type f -name 'output_*.zst' | parallel --jobs ${jobs} --plus ${CURDIR}/yodns/yodns/yodns convertFormat --in={} --out=${outputDir}/capstone_test/json/{/..}.json
 	#Get stats on domains to check functionality/scan success
 	find ${outputDir}/capstone_test/data -type f -name 'output_*.zst' | parallel --jobs ${jobs} --plus ${CURDIR}/yodns/yodns/yodns stats --in={} --out=${outputDir}/capstone_test/stats/{/..}.json.zst 
+
+
 
 # This runs a minimal experiment to showcase how to use yodns and evaluate its results
 # The experiment includes a scan, validation of the results, and an evaluation.

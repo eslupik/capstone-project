@@ -1,0 +1,4 @@
+Domain Name,Inconsistent IPs,IP Record Type
+generationxyz.nic.xyz.,{'185.24.64.200'},A
+c.nic.ir.,{'141.95.65.136'},A
+generationxyz.nic.xyz.,{'2a04:2b00:13cc::1:200'},AAAA

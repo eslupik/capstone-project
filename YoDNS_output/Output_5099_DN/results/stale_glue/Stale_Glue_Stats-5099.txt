@@ -1,0 +1,4 @@
+1. Total stale A recs: 1656/258858 (0.63973%),
+ 36 unique stale IP(s) from 12 NS names.
+2. Total stale AAAA recs: 9/241276 (0.00373%),
+ 1 unique stale IP(s) from 1 NS names.
