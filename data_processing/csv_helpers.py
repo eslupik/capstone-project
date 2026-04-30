@@ -40,17 +40,15 @@ def write_csv_dict(dict, filename, fieldnames):
             to_write.writerow({fieldnames[0]: ID, fieldnames[1]: val})
 
 
-def write_csv(A_dict, AAAA_dict, filename, fieldnames):
+def write_csv(dicts, names, filename, fieldnames):
 
     with open(filename, 'w', newline='') as csvfile: #Syntax for writing to a csv file found from: https://docs.python.org/3/library/csv.html#csv.QUOTE_NONNUMERIC
         to_write = csv.writer(csvfile, delimiter=",", quoting=csv.QUOTE_MINIMAL)
 
         to_write.writerow(fieldnames)
 
-        for DN, Ips in A_dict.items():
-            to_write.writerow([DN, Ips, 'A'])
-
-        for DN, Ips in AAAA_dict.items():
-            to_write.writerow([DN, Ips, 'AAAA'])
+        for i in range(len(dicts)):
+            for DN, IPs in dicts[i].items():
+                to_write.writerow([DN, IPs, names[i]])
 
 

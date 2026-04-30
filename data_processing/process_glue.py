@@ -19,7 +19,11 @@ NUM_DNS: Final[str] = str(args.Num_DNs)
 
 AUTH_MESSAGE: Final[str] = 'Answer'
 GLUE_MESSAGE: Final[str] = 'GlueRecords' 
+
+A_NAME: Final[str] = 'A'
 A_TYPE: Final[int] = 1
+
+AAAA_NAME: Final[str] = 'AAAA'
 AAAA_TYPE: Final[int] = 28
 
 #Finding relevant file paths to access json files for parsing
@@ -31,8 +35,20 @@ GLUE_A_DIR: Final[Path] = BASE_DIR / 'Glue' / 'A_Glue'
 AUTH_AAAA_DIR: Final[Path] = BASE_DIR / 'Auth' / 'AAAA_REC'
 GLUE_AAAA_DIR: Final[Path] = BASE_DIR / 'Glue' / 'AAAA_Glue'
 
-OUTPUT_DIR: Final[Path] = Path(__file__).resolve().parent.parent / 'YoDNS_output'/ f'Output_{NUM_DNS}_DN' / 'results' / 'stale_glue' / f'Inconsistenst_IPs-{NUM_DNS}.csv'
+REC_TYPES: Final[list] = [(A_NAME, A_TYPE, AUTH_A_DIR, GLUE_A_DIR), (AAAA_NAME, AAAA_TYPE, AUTH_AAAA_DIR, GLUE_AAAA_DIR)]
+
+NAME: Final[int] = 0
+TYPE: Final[int] = 1
+AUTH_DIR: Final[int] = 2
+GLUE_DIR: Final[int] = 3
+
+
+
+OUTPUT_CSV: Final[Path] = Path(__file__).resolve().parent.parent / 'YoDNS_output'/ f'Output_{NUM_DNS}_DN' / 'results' / 'stale_glue' / f'Inconsistenst_IPs-{NUM_DNS}.csv'
 INCON_HEADERS: Final[list[str]] = ['Domain Name', 'Inconsistent IPs', 'IP Record Type']
+
+OUTPUT_TXT: Final[Path] = Path(__file__).resolve().parent.parent / 'YoDNS_output'/ f'Output_{NUM_DNS}_DN' / 'results' / 'stale_glue' / f'Stale_Glue_Stats-{NUM_DNS}.txt'
+
 
 #FUNCTIONS_______________________________________________________________________________________________________
 def load_json_file(filepath: Path, message_type: str):
@@ -69,7 +85,7 @@ def process_json(rec_dict: dict, entry: dict, glue_ct_dict: dict, message_type: 
 
     for record in answer:
         #Filter out answer signatures/other record types within the answer resource records
-        if record['Type'] in [A_TYPE, AAAA_TYPE]: 
+        if record['Type'] in [rec_type[TYPE] for rec_type in REC_TYPES]: 
 
             DN = record['Name']
             IP = record['Value']
@@ -84,7 +100,6 @@ def process_json(rec_dict: dict, entry: dict, glue_ct_dict: dict, message_type: 
             if message_type == GLUE_MESSAGE:
                 #Keep track of the number of glue records found for each IP to estimate proportions of stalee glue records encountered by YoDNS
                 update_ct(glue_ct_dict, IP)
-
     #pprint(rec_dict)
     return glue_ct
 
@@ -120,18 +135,18 @@ def compare_recs(auth_dict: dict, glue_dict: dict):
 
 
 #This function (with modifications) was created by Gemini
-def is_stale(dns_ip, ns_hostname, rec_type):
+def is_stale(dns_ip: str, ns_hostname: str, rec_type: str):
+    '''Prompts a stale glue candidate IP for its supposed name's A record and verifies if it provides its own IP'''
+
     resolver = dns.resolver.Resolver(configure=False)
     resolver.nameservers = [dns_ip]  # Direct the query to your old IP
     resolver.timeout = 2             # How long to wait for a response
     resolver.lifetime = 2
 
     try:
-        answer = resolver.resolve(ns_hostname, rec_type)
-        #rev_answer = dns.resolver.resolve_address(dns_ip)
+        answer = resolver.resolve(ns_hostname, rec_type) #Ask IP for its own A record
         
         A_recs = [addr.to_text() for addr in answer]
-        #ns_names = [rr.target.to_text() for rr in rev_answer]
 
         if dns_ip in A_recs:
             #print(f"Glue still works! A_recs found: {A_recs}\n Reverse lookup response: for {ns_hostname}: {ns_names}.")
@@ -147,28 +162,24 @@ def is_stale(dns_ip, ns_hostname, rec_type):
         return True
 
 
-
-def lookup_inconsistent(A_glue: dict, AAAA_glue: dict):
+def verify_stale(inc_dict: dict, rec_type: str):
     '''Takes dicts of identified inconsistent glue records and performs NS lookups on these IPs to determine if they are stale'''
-    #lookup_dict = {}
 
-    ddicts = {'A': A_glue, 'AAAA': AAAA_glue}
+    for DN, IPset in inc_dict.items():
 
-    for rec_type, rec_dict in ddicts.items():
+        for IP in IPset:
+            if not is_stale(IP, DN, rec_type):
+                inc_dict[DN].remove(IP)
+                print("IP removed!")
 
-        for DN, IPset in rec_dict.items():
+        if not inc_dict[DN]:
+            inc_dict.pop(DN)
 
-            for IP in IPset:
-                if not is_stale(IP, DN, rec_type):
-                    rec_dict[DN].remove(IP)
-                    print("IP removed!")
 
-            if not rec_dict[DN]:
-                rec_dict.pop(DN)
-
-    #return lookup_dict
 
 def calc_total_stale(stale_dict: dict, ct_dict: dict):
+    '''Calculates the total number of encountered stale glue records of a specific type 
+    using a dict mapping DNs to stale IPs and the frequency of those IPs in glue records'''
 
     total_stale = 0
     unique_stale = 0
@@ -183,41 +194,48 @@ def calc_total_stale(stale_dict: dict, ct_dict: dict):
     return total_stale, unique_stale
 
 
+
+def write_report(stats, lens, names):
+    '''Write final analytics report to a txt file'''
+
+    with open(OUTPUT_TXT, "w") as file: #Used Gemini to remind me of the syntax to write to a txt file
+        
+        for i in range(len(lens)):
+            file.write(f"{i+1}. Total stale {names[i]} recs: {stats[i][0]}/{stats[i][1]} ({stats[i][2]}%),\n {stats[i][3]} unique stale IP(s) from {lens[i]} NS names.\n")
+
+
 def main():
 
-    
-    #For A (Ipv4) records:
-    auth_A_dict = load_json_file(AUTH_A_DIR, AUTH_MESSAGE)[0]
-    glue_A_dict, glue_A_ct_dict, total_A_glue = load_json_file(GLUE_A_DIR, GLUE_MESSAGE)
-    #Identify inconsistent glue A records (not present in authorized records)
-    inconsistent_A_glue = compare_recs(auth_A_dict, glue_A_dict)
+    inconsistent_dicts = []
+    stats = []
 
-    #For AAAA (Ipv6) records:
-    auth_AAAA_dict = load_json_file(AUTH_AAAA_DIR, AUTH_MESSAGE)[0]
-    glue_AAAA_dict, glue_AAAA_ct_dict, total_AAAA_glue = load_json_file(GLUE_AAAA_DIR, GLUE_MESSAGE)
-    #Identify inconsistent glue AAAA records (not present in authorized records)
-    inconsistent_AAAA_glue = compare_recs(auth_AAAA_dict, glue_AAAA_dict)
+    for rec_type in REC_TYPES:
+
+        #Get dictionaries for all unique authoritative and glue records of a type
+        auth_dict = load_json_file(rec_type[AUTH_DIR], AUTH_MESSAGE)[0]
+        glue_dict, glue_ct_dict, total_glue = load_json_file(rec_type[GLUE_DIR], GLUE_MESSAGE)
+
+        #Identify inconsistent glue records (not present in authorized records)
+        inconsistent_glue = compare_recs(auth_dict, glue_dict)
+
+        verify_stale(inconsistent_glue, rec_type[NAME])
+        inconsistent_dicts.append(inconsistent_glue)
+
+        # pprint(inconsistent_glue)
+        # pprint(glue_ct_dict)
+        # print(total_glue)
+
+        total_stale, unique_stale = calc_total_stale(inconsistent_glue, glue_ct_dict)
+        percent_stale = round((float(total_stale)/total_glue)*100, 5)
+
+        stats.append((total_stale, total_glue, percent_stale, unique_stale))
+        print(f"Total stale {rec_type[NAME]} recs: {total_stale}/{total_glue} ({percent_stale}%), {unique_stale} unique stale IP(s) from {len(inconsistent_glue)} NS names.")
+    
+    names = [rec[NAME] for rec in REC_TYPES]
 
     #Write identified inconsistent glue records to a csv file
-    csv_helpers.write_csv(inconsistent_A_glue, inconsistent_AAAA_glue, OUTPUT_DIR, INCON_HEADERS)
-
-    lookup_inconsistent(inconsistent_A_glue, inconsistent_AAAA_glue)
-
-    # pprint(inconsistent_A_glue)
-    # pprint(glue_A_ct_dict)
-    # print(total_A_glue)
-    # pprint(inconsistent_AAAA_glue)
-
-    total_stale_A, unique_stale_A = calc_total_stale(inconsistent_A_glue, glue_A_ct_dict)
-    percent_stale_A = round((float(total_stale_A)/total_A_glue)*100, 2)
-
-    total_stale_AAAA, unique_stale_AAAA = calc_total_stale(inconsistent_AAAA_glue, glue_AAAA_ct_dict)
-    percent_stale_AAAA = round((float(total_stale_AAAA)/total_AAAA_glue)*100, 2)
-
-    print(f"Total stale A recs: {total_stale_A}/{total_A_glue} ({percent_stale_A}), {unique_stale_A} unique stale IPs from {len(inconsistent_A_glue)} NS names.")
-    print(f"Total stale AAAA recs: {total_stale_AAAA}/{total_AAAA_glue} ({percent_stale_AAAA}), {unique_stale_AAAA} unique stale IPs from {len(inconsistent_AAAA_glue)} NS names.")
-    
-    
+    csv_helpers.write_csv(inconsistent_dicts, names, OUTPUT_CSV, INCON_HEADERS)
+    write_report(stats, [len(d) for d in inconsistent_dicts], names)
     
 
     
