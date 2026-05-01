@@ -268,11 +268,17 @@ _While simple, this script seems to correctly identify stale glue records encoun
 ### 3.8. Extracted Relevent Records for Dangling CNAME Identification
 _Task leader: Chenyun_
 
+The information we needed from the raw YoDNS output was relatively simple: we only needed authoritative CNAME records. In DNS, CNAME records have rtype == 5, and authoritative answers are marked with the AA flag. Therefore, we used our modified extractMessagesCapstone command to filter the raw output and extract all messages where rtype == 5 and the response was authoritative. These filtered records then served as the input for our later analysis of potential dangling CNAMEs.
+
+Path: `YoDNS_output/Output_9295_DN/filtered/CNAME_REC`
+
+
 
 
 ---
 ### 3.9. Analyzed Filtered Records to Identify Dangling CNAMEs
 _Task leader: Chenyun_
+
 
 
 
