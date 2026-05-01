@@ -68,8 +68,25 @@ _Task leader: Chenyun_
 We also designed the code to distinguish between:
 
 - **Accepted candidates**: Domains with usable DNS results.
-   - Some of them are very interesting though, for example where a candidate's dns resolution status is `NOERROR` but  the returned result is `null`.
 - **Excluded candidates**: Domains with unhelpful, empty, or invalid results.
+   - Some of them are very interesting though, for example where a candidate's dns resolution status is `NOERROR` but  the returned result is `null`.
+
+**About Subfinder:**
+At the beginning of our subdomain collection process, we used CT logs, which contain public records of issued SSL/TLS certificates. However, we later realized that CT logs were not practical for our pipeline. The main limitation was their strict rate limits, which made it difficult to collect a large amount of data efficiently. Even though CT log services provide APIs that can be integrated into scalable scripts, the rate limits significantly slowed down our data collection process. Another issue was that the data from CT logs contained too much noise. Many certificates are wildcard certificates, such as *.example.com, and expanding them does not necessarily produce real, existing subdomains.
+
+Therefore, we decided to use Subfinder instead. I first learned about this tool through Kali Linux. It is a useful subdomain discovery tool because it combines multiple data sources, including DNS brute-force enumeration, passive DNS, and intelligence platforms. We used Subfinder with its default configuration, without any API keys or additional service integrations. Subfinder was invoked via command line with the -silent and -d flags, relying solely on its built-in passive DNS enumeration sources that do not require authentication. 
+
+This setup was sufficient for our goal because we did not need to collect a large number of subdomains from a single root domain. In fact, we wanted to avoid that situation. If too many candidate subdomains come from the same second-level domain, there may be a large amount of zone overlap in the final dataset(YoDNS result). This would reduce the diversity of the domains we analyze and make the results less representative. 
+
+**important things we learned:**
+
+   1. At first, We was concerned that subdomain collection might raise security concerns. However, we later learned that Subfinder, under its default configuration, primarily relies on passive subdomain enumeration. In other words, it does not actively probe the target domain by sending DNS queries directly to it. Instead, it gathers publicly available subdomain information from existing Internet sources. This made Subfinder more appropriate for our pipeline, because it allowed us to collect candidate subdomains while minimizing unnecessary traffic toward the target domains.
+
+   2. The initial implementation was far too slow for our use case. Processing a dataset of approximately 3,000 domains took over 10 hours, which made iterating on the pipeline impractical.There were two main bottlenecks:
+      - **Sequential DNS resolution**: The original code resolved each candidate domain one at a time. Each `dig` call involves a network round-trip that typically takes anywhere from 20ms to 500ms. With up to 10k domains, the total number of `dig` calls could reach into the hundreds of thousands, all waiting sequentially. Since `dig` is IO-bound, the CPU was sitting idle for the vast majority of the runtime.
+      - **Per-row file writes**: The original code opened, wrote to, and closed the output CSV file for every single candidate row. Opening and closing a file thousands of times accumulates significant overhead over a long run.
+   
+   We addressed both issues in the optimized version. For DNS resolution, we introduced concurrent `dig` calls using Python's `ThreadPoolExecutor`, issuing up to 20 parallel requests per root domain. Since each thread spends most of its time waiting for a network response, running 20 at once costs roughly the same wall-clock time as running 1. For file writes, instead of writing after every row, we accumulate all accepted and excluded rows in memory and write them to disk in a single pass at the end, reducing thousands of file operations down to two.
 
 ---
 
