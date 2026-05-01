@@ -57,6 +57,7 @@ _The goal of this stage was to avoid running YoDNS blindly on arbitrary names an
 
 ### 3.2. We Implemented a Subdomain Collection with Subfinder
 _Task leader: Chenyun_
+Path= `data_preprocess/prepare_subfinder_data.pyNOERROR`
 
 **We wrote preprocessing code to automate the following steps:**
    1. Read root domains from input CSV files
@@ -267,10 +268,9 @@ _While simple, this script seems to correctly identify stale glue records encoun
 ---
 ### 3.8. Extracted Relevent Records for Dangling CNAME Identification
 _Task leader: Chenyun_
+Path: `YoDNS_output/Output_9295_DN/filtered/CNAME_REC`
 
 The information we needed from the raw YoDNS output was relatively simple: we only needed authoritative CNAME records. In DNS, CNAME records have rtype == 5, and authoritative answers are marked with the AA flag. Therefore, we used our modified extractMessagesCapstone command to filter the raw output and extract all messages where rtype == 5 and the response was authoritative. These filtered records then served as the input for our later analysis of potential dangling CNAMEs.
-
-Path: `YoDNS_output/Output_9295_DN/filtered/CNAME_REC`
 
 
 
@@ -278,6 +278,49 @@ Path: `YoDNS_output/Output_9295_DN/filtered/CNAME_REC`
 ---
 ### 3.9. Analyzed Filtered Records to Identify Dangling CNAMEs
 _Task leader: Chenyun_
+Path: `data_processing/process_cname.py`
+
+We wrote a script that scans a directory of DNS response JSON files, reconstructs CNAME chains, detects dangling or misconfigured records, and saves the results to CSV files.
+
+
+#### Pipeline
+
+```
+JSON files (cname-dir/)
+        │
+        ▼
+ [Phase 1] Parse & Build CNAME Map
+  - Read all .json files in parallel (8 threads)
+  - For each DNS answer with Type=5 (CNAME), record name → value
+  - Detect misconfiguration: same name mapping to multiple different targets
+        │
+        ▼
+ [Phase 2] Follow CNAME Chains
+  - Identify chain start points (names that are never a CNAME target)
+  - Recursively follow each chain to its final endpoint
+  - Detect and short-circuit cycles
+        │
+        ▼
+ [Phase 3] Dig Endpoints (20 threads)
+  - For each start → endpoint pair, run `dig <endpoint>`
+  - Parse the status field: NOERROR, NXDOMAIN, SERVFAIL, TIMEOUT, etc.
+        │
+        ▼
+ [Phase 4] Save Results (output-dir/)
+  - all_results.csv     — every start domain with its endpoint and dig status
+  - dangling_cname.csv  — entries where dig returned NXDOMAIN/SERVFAIL/TIMEOUT/UNKNOWN
+  - misconfig.csv       — domains whose CNAME target was inconsistent across records
+```
+
+
+#### Dangling CNAME Detection
+
+A CNAME chain is considered **dangling** if the final endpoint resolves with a failure status (`NXDOMAIN`, `SERVFAIL`, `TIMEOUT`, or `UNKNOWN`). These are potential subdomain takeover risks.
+
+#### Misconfiguration Detection
+
+A domain is flagged as **misconfigured** if different DNS records map it to more than one CNAME target — indicating conflicting or stale records across nameservers.
+
 
 
 
@@ -322,7 +365,7 @@ In order to replicate a YoDNS scan and analysis for stale glue and dangling CNAM
 
 ---
 
-## Current Results/Artifacts
+## 5.Current Results/Artifacts
 
 ### 1. run_scan and filter_results makefile functions
 - Both present in the `makefile` within the main repository folder, in addition to earlier experiments, the makefile allows you to:
@@ -337,8 +380,19 @@ In order to replicate a YoDNS scan and analysis for stale glue and dangling CNAM
       A) Authoritative A record (Ipv4) answers.
       B) Authoritative AAAA record (Ipv6) answers.
       C) All NS record answers.
+
+### 3. Python scripts to process and analyze data
+   Path: `data_preprocess/prepare_subfinder_data.py`,`data_processing/process_cname.py`, `data_processing/process_glue.py`
+
+### 4. Final results from scanning 9295 candidates
+   Path: `YoDNS_output/Output_9295_DN/results`
  
 ---
+## 6.Final results analysis( outdated CNAME and glue records)
+
+
+
+
 
 ## Future Directions
 
