@@ -389,50 +389,127 @@ In order to replicate a YoDNS scan and analysis for stale glue and dangling CNAM
  
 ---
 
-
 ## 6. Final Results Analysis (Outdated CNAME and Glue Records)
 
 ### Dangling CNAMEs
 
-From 9295 subdomains, we extracted 2605 unique CNAME chains, among which we identified 9 misconfiguration cases and 1 dangling CNAME candidate. The extremely low incidence of problematic CNAMEs is not surprising, and is in fact expected given our methodology.
+From 9,295 subdomains, we extracted 2,605 unique CNAME chains. In these results, we found 9 possible misconfiguration cases and 1 dangling CNAME candidate. This number is very small, but it is reasonable because of how we built our dataset.
 
-In the data-preprocessing stage, we only retained candidates whose endpoints returned a clean DNS status via `dig` — filtering out any that produced `NXDOMAIN`, `SERVFAIL`, `TIMEOUT`, or similar failure codes. This means the straightforward class of dangling CNAMEs — where the endpoint domain has simply been deleted or expired — was already excluded from our dataset by design. Specifically, in the normal dangling case: if `A CNAME B`, and `B`'s underlying resource record has been removed or its domain has lapsed, a standard `dig A` will follow the chain to `B` and return `NXDOMAIN` making the dangling condition immediately and trivially detectable.
+During data preprocessing, we only kept candidates that returned a normal DNS result when tested with `dig`. We filtered out domains that returned errors such as `NXDOMAIN`, `SERVFAIL`, `TIMEOUT`, or other failure results.
 
-What we are interested in, instead, is the more subtle class of dangling CNAMEs that evade simple `dig`-based detection but can be surfaced by a full-tree DNS lookup such as **YoDNS**. These arise primarily from nameserver-level misconfiguration. Consider the following scenario: `NS_1` resolves `A CNAME B`, while `NS_2` resolves `A CNAME C`. The inconsistency itself already constitutes a misconfiguration — the same domain has divergent CNAME targets across authoritative nameservers. Now suppose `C` has been decommissioned but its DNS record was never cleaned up. A standard `dig` query, depending on which nameserver it happens to reach, may consistently be routed to `B` (which
-resolves correctly) and never expose the broken path through `C`. The dangling condition is thus latent and load-path-dependent. Only a tool that exhaustively queries all authoritative nameservers and reconstructs the full resolution tree can reliably surface this class of vulnerability.
+Because of this, the most obvious type of dangling CNAME was already removed before the final analysis. For example, suppose we have:
 
-#### Analysis of Detected results
-Among the 9 flagged misconfiguration cases, closer inspection reveals that the majority are not genuine misconfigurations. Our script flags a domain as misconfigured whenever it observes the same name mapping to two different CNAME targets across different DNS records — but as we will show, this can happen for entirely legitimate reasons. We categorize the 9 cases below.
+```text
+A CNAME B
+```
 
-1. Category 1: Anycast (False Positives)
-   Unlike a normal CNAME that always points to exactly one fixed target, a traffic-managed domain is designed to return different answers to different resolvers — routing each user to the nearest or least-loaded backend. When our script collects DNS responses from many vantage points and sees the same domain resolve to two different targets, it cannot tell whether this is a mistake or a routing policy. It flags all of them.
+If `B` has been deleted, expired, or no longer has a valid DNS record, then running `dig A` will usually follow the CNAME chain to `B` and return `NXDOMAIN`. This kind of dangling CNAME is easy to detect with a normal `dig` query, so it would not remain in our final dataset.
 
-   For example, `manage-pe.trafficmanager.net` returns three different targets across `westus`, `eastus`, and `centralus` — classic geographic routing where each region's resolvers get directed to the nearest backend.
+Instead, we are interested in a more hidden type of dangling CNAME. This type may not be detected by a simple `dig` query, but it may be found by a full-tree DNS lookup tool such as **YoDNS**.
 
-2. Infrastructure Migration
-   A second class of apparent misconfigurations arises when an organization is in the middle of migrating from one infrastructure setup to another. During the transition, the old DNS record and the new DNS record may temporarily coexist on different nameservers. This window can last minutes or days depending on TTL. 
-   For example, `cdn.awehunt.com` points to either an Alibaba OSS bucket (`oss-cn-beijing.aliyuncs.com`) or an Alibaba CDN endpoint (`cdngslb.com`) — a classic pattern of migrating from direct object-storage hosting to a CDN layer.
-   These cases are ambiguous. Under normal cases they resolve correctly because most resolvers will get one consistent answer, but the inconsistency itself indicates a window of risk. If the old target were to become dangling before the migration completes(TTL too long), it would be very difficult to detect.
+For example, consider this situation:
 
-3. Genuine Misconfiguration
-   `www.solarmagazine.nl` is the one case that looks like an actual mistake. Its two conflicting CNAME targets are `solar-vps.slcloud.nl` (a VPS host) and `solarmagazine.nl` — the apex domain itself. This is a problem because, per DNS standards (RFC 1034), a zone apex cannot be a CNAME target — the root of a domain must have SOA and NS records, which are incompatible with being an alias. A www record that resolves to the apex will behave unpredictably across different resolvers, some of which will return an error and others of which will attempt to follow the chain anyway.
+```text
+NS_1 returns: A CNAME B
+NS_2 returns: A CNAME C
+```
 
+Here, two authoritative nameservers give different CNAME answers for the same domain. This is already a DNS inconsistency. Now suppose `C` has been removed, but the DNS record was not fully cleaned up.
 
+A normal `dig` query may only reach the nameserver that returns `B`, which still works correctly. In that case, everything looks normal. However, another nameserver may still return the broken path through `C`. This means the dangling CNAME problem is hidden and depends on which nameserver is queried.
 
-
-
-
-### Stale Glue
-
-
-
-
-
-
-
+This is why YoDNS is useful for our project. It can query authoritative nameservers more completely and show different answers across the DNS tree. This helps us find problems that a normal `dig` query may miss.
 
 ---
 
+#### Analysis of Detected Misconfiguration Cases
+
+Among the 9 cases flagged by our script, most of them may not be real misconfigurations.
+
+Our script marks a domain as misconfigured when it sees the same domain pointing to different CNAME targets. However, this does not always mean the DNS configuration is wrong. In some cases, different CNAME answers are intentional.
+
+**1. Anycast / Traffic Management (False Positives)**
+
+Some domains are designed to return different answers to different users or resolvers. This is common for traffic management, load balancing, and geographic routing.
+
+Unlike a normal CNAME that always points to one fixed target, a traffic-managed domain may return different targets depending on location, server load, or routing policy. For example, users in different regions may be sent to different backend servers.
+
+In our results, `manage-pe.trafficmanager.net` returned different targets across `westus`, `eastus`, and `centralus`. This looks like normal geographic routing, where users are sent to nearby backend servers.
+
+Similarly, `production-v2-tm-dns.trafficmanager.net` returned both `app-01` and `app-02` in the `francecentral` region. This looks like a normal active-active redundancy setup, where multiple servers are used at the same time for reliability.
+
+The suffix `trafficmanager.net` is also a strong sign that these different answers are intentional. Therefore, these cases are likely false positives rather than real mistakes.
+
+**2. Infrastructure Migration (Ambiguous Cases)**
+
+Another reason for different CNAME answers is infrastructure migration.
+
+When an organization moves from one hosting setup to another, old and new DNS records may exist at the same time. For example, one nameserver may already have the new answer, while another nameserver may still return the old answer. This can happen during a transition period and may last from minutes to days depending on DNS TTL settings.
+
+For example, `cdn.awehunt.com` points to either an Alibaba OSS bucket:
+
+```text
+oss-cn-beijing.aliyuncs.com
+```
+
+or an Alibaba CDN endpoint:
+
+```text
+cdngslb.com
+```
+
+This looks like a migration from direct object-storage hosting to a CDN layer.
+
+These cases are ambiguous. They may still resolve correctly under normal conditions, so they may not be immediately dangerous. However, the inconsistency still creates a risk window. If the old target becomes invalid before the migration is fully completed, it could become a dangling CNAME that is harder to detect.
+
+**3. Likely Real Misconfiguration**
+
+The case that looks most like a real mistake is:
+
+```text
+www.solarmagazine.nl
+```
+
+It has two conflicting CNAME targets:
+
+```text
+solar-vps.slcloud.nl
+solarmagazine.nl
+```
+
+The first target, `solar-vps.slcloud.nl`, looks like a VPS host. The second target, `solarmagazine.nl`, is the apex domain.
+
+According to DNS standards, a zone apex should not be used as a CNAME in this way. The apex domain must contain important DNS records such as `SOA` and `NS`. These records are not compatible with treating the apex as a pure alias.
+
+Because of this, `www.solarmagazine.nl` may behave differently depending on the resolver. Some resolvers may return an error, while others may still try to follow the CNAME chain.
+
+---
+
+#### The Dangling CNAME Case
+
+The single confirmed dangling CNAME candidate is:
+
+```text
+seller-adcp-qa.magnite.com.
+    → internal-all-seller-adcp-2071761466.us-west-2.elb.amazonaws.com.
+    → NXDOMAIN
+```
+
+This means that `seller-adcp-qa.magnite.com` pointed to an AWS Elastic Load Balancer hostname that did not exist at the time of detection.
+
+This is a security risk because deleted cloud resources can sometimes become available again. If another AWS user could create a load balancer with the same name, they might be able to serve content under `seller-adcp-qa.magnite.com`, which is a real Magnite subdomain. They would not need to change Magnite's DNS records directly.
+
+This type of issue is called **subdomain takeover**.
+
+However, when we later re-ran `dig` on this endpoint, it returned `NOERROR`. This means Magnite likely restored or updated the record. Therefore, the problem appears to have been real but temporary. It also suggests that Magnite's infrastructure team may have noticed and fixed the issue.
+
+---
+
+### Stale Glue Records
+
+To be done.
+
+---
 
 ## 7.Future Directions
 
