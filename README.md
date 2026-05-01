@@ -4,8 +4,8 @@
 
 This project uses **YoDNS**, a unique measurement toolchain, to study and identify the prevalence of DNS infrastructure issues, specifically:
 
-- **Stale glue A and AAAA records**
-- **Stale / dangling CNAME records**
+- **Stale glue `A` and `AAAA` records**
+- **Stale / dangling `CNAME` records**
 
 Our goal is not just to measure final DNS answers for records such as `A`, `NS`, or `CNAME` records, since ordinary `dig` can already do that. However, typical resolvers utilize optimization strategies such as caching to reduce query load, and as such may not accurately capture the reality of DNS structure by not engaging in full DNS tree traversal [1]. Instead, we use YoDNS, designed by Steurer et al. [2025], to analyze DNS dependency structure and the query process at scale.
 
@@ -125,8 +125,8 @@ We identified that, in order to identify dangling records, we needed to get acce
 
 ---
 
-### 3.6. Extracting Relevant `Messages.Message` Components to ID Stale Glue Records
-
+### 3.6. Extracted Relevant `Messages.Message` Components to Identify Stale Glue Records
+_Task leader: Emma_
 #### 3.6.a. Extracting messages and utilizing provided YoDNS code
 As Steurer et al. [2025] scanned 812M domains over the course of 40 days, we positied that the large `yodns`codebase cloned from the GitHub repository would contain some built-in (efficient) methods for reading our binary output messages encoded using `protobuf` and filtering that output effectively. As such, we began to explore the provided yodns commands and their underlying code/data structures.
 
@@ -231,38 +231,54 @@ Utilization of this struct/package hierarchy enabled us the trace the filtering 
    ]
 }
 ```
+---
+### 3.7. Analyzed Filtered Authoritative and Glue `A` and `AAAA` Record Output for Stale Glue Records
+_Task leader: Emma_
 
+Now equipped with simple, filtered records, we learned how to parse through `.json` files in a python script (located at `/capstone-project/data_processing/process_glue.py`) with the following analysis pipeline:
+1. Unzip and iterate through every authoritative `json` object/record entry and create a dictionary mapping every encountered DN to a set containing its IP records aquired from authoritative nameservers.
+   - _Any `Message.Answer` entries not containing an `A` or `AAAA` record (example: `RRSIG` records that were not filtered out prior) are ignored._
+2. Unzip and iteracte through every glue record, creating a `{DN: {Ips}}` dictionary, while  also creating a glue record frequency count dictionary (`{IP: FreqCt}`) and keeping track of the total number of glue records.
+3. Compare the authoritative and glue dictionaries of the same format to determine if there are any IPs encountered in glue records that are not present in the authoritative record IP set for that DN (for shared DNs, `inconsistent = glue_IP_set - auth_IP_set`).
+4. Verify that these inconsistent glue records are stale by querying each NS with an inconsistent glue record for its own IP address (`A` or `AAAA` depending on the inconsistent record type) and determine if it provides its own IP. If not, as NSes are authoritative for their own IP records (they look into local zone data to provide the answer), the glue record is likely stale/outdated; that IP is no longer associated with that NS and could leave domains susceptible to attack if the NS domains are re-registered or the stale IPs are obtained [2].
+5. Calculate basic stale-glue statistics:
+   - The percentage of glue records encountered by YoDNS that are stale
+   - The number of unique IPs and NSes that have stale glue records
+  
+_While simple, this script seems to correctly identify stale glue records encountered during a YoDNS scan, thus fufilling our first objective._
 
+---
+### 3.8. Extracted Relevent Records for Dangling CNAME Identification
+_Task leader: Chenyun_
 
 
 
 ---
+### 3.9. Analyzed Filtered Records to Identify Dangling CNAMEs
+_Task leader: Chenyun_
 
 
-
-Our current stale glue workflow is:
-
-1. Extract domains with `NS` records from YoDNS `Zonedata`.
-2. For each such domain, search YoDNS `Messages` for referral responses whose `Additional` section contains `A/AAAA` records for the delegated nameservers.
-3. Treat those `Additional` `A/AAAA` records as raw glue.
-4. Compare the raw glue with the nameserver IPs stored in `Zonedata`.
-5. Resolve each nameserver hostname separately to obtain its current `A/AAAA` records.
-6. If the parent-side glue differs from the current nameserver address, mark it as a **stale-glue candidate**.
-
----
-
-### 7. Investigated how to handle YoDNS binary output
-
-We also clarified that large-scale YoDNS analysis should ideally process the **binary protobuf output directly**, instead of converting everything to JSON first, since we already tried directly processing json data, and it is too large.
-
-At this stage, we need to:
-
-- learned the difference between YoDNS binary output and JSON output
-- learned how to use protobuf to process binary data
 
 ---
 ## 4. Exact Procedure Replication
 _Instructions for precisely replicating a YoDNS experiment to identify stale glue records and dangling CNAMEs_
+
+In order to replicate a YoDNS scan and analysis for stale glue and dangling CNAME records, follow this procedure:
+
+### **In the `makefile`**: 
+(located directly in the `/capstone-project` directory)
+
+1. Change the "general" and "scan" parameters to your desired output:
+   - Set `Num_DNs` to the number of domains in your scan `input.csv` file.
+   - Ensure the `configSubDir` is set to the one containing the `runconfig.json5` file you want to use for the configuration of your scan.
+   - Specify the name of your `input.csv` file and make sure it is placed in the same folder as your config file.
+   - Specify the `inputLen` (number of DNs to scan from your provided input list)
+   - Specify `parallelFiles` (the number of parallel files you want to be created and written to simultaneouslt during a scan; additional files will be created incrementally in blocks of this size if more are needed for larger inputs.
+   - Specify `fileSize` (the number of DN resolutions per output file)
+        - For example, if you are scanning 1,000,000 DNs with 250 parallel files and a file size of 1000, 250 output files will be created and filled a total of four consecutive times before the scan is complete.
+   - While specified within the target `run_scan`, as this parameter was adequate for the server, the `--threads` flag can be used to set the max threads used for the scan.
+   2. 
+     
 
 
 ---
@@ -285,9 +301,9 @@ _Instructions for precisely replicating a YoDNS experiment to identify stale glu
  
 ---
 
-## Next Steps
+## Future Directions
 
-Our next tasks are:
+If we were to continue with this project, our next steps would be...
 
 1. Continue improving the preprocessing pipeline and candidate quality, we still need more data.
 3. Learn how to process binary output
@@ -296,3 +312,6 @@ Our next tasks are:
 4. Extend the pipeline later for bad or dangling CNAME analysis.
 
 ---
+## References
+
+
