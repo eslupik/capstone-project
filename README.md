@@ -147,10 +147,90 @@ _We managed to run/ran these commands in our makefile_
 4. `stats` _(optional command that allows us to see every target DN resolved in a specific output file, ending with a total number of DNs resolved, total messages and optional tagged DN counts)_
 5. `extractMessages`: This command allowed us to filter YoDNS `json` output messages for specific `RCode` types and from only authoritative servers, which was our first step towards filtering the YoDNS output data for our specific goals.
 
-_However, we did not feel like `extractMessages` was adequate, as large quantities of data we had no intention of using (Domain lists, Zonedata, and Message metadata) was still "clogging up" these large `.json` extracted output files. As a result, we looked into the underlying structure of the Go code for this command (located in `yodns/yodns/cmd/extractMessages.go` and a variety of other folders)..._
+_However, we did not feel like `extractMessages` was adequate, as large quantities of data we had no intention of using (Domain lists, Zonedata, and Message metadata) was still "clogging up" these large `.json` extracted output files. More importantly, there was no flag to specify only glue records; we could only extract every NS query message exchange. As a result, we looked into the underlying structure of the Go code for this command (located in `yodns/yodns/cmd/extractMessages.go` and a variety of other folders)..._
 
 #### 3.6.b. Learn about the YoDNS struct system and using it to create our own modified message filtering command
+Through tracing the `extractMessages.go` and `filters.go` files, we realized that numerous packages referencing files in other subfolders/directories, largely within the `yodns/resolver` directory, were imported and outline a complex system of structs that creates a somewhat object-oriented representation of the YoDNS scan components. The most important structs we identified for our purpose of filtering messages are mapped as follows:
 
+   _*Note: not all the instance variables of each struct are provided, only the ones useful to our project_
+
+```mermaid
+graph TD;
+A{package <b>model</b>} --> B([type <b>MessageExchange</b> <br> struct]);
+B ----> C([<b>OriginalQuestion</b>: <br><i>model.Question struct]);
+A ----> C;
+B ----> D[ResponseAddr: <br><i>string];
+B ----> E([<b>NameServerIP</b>:<br> <i>netip.Addr struct]);
+B ----> F([<b>Metadata</b>: <br> <i>model.Metadata struct]);
+A ----> F;
+B ----> G([<b>Message</b>:<br> <i>*model.Message struct]);
+A ----> G;
+B ----> H([<b>Error</b>: <br> <i>model.SendError struct]);
+A ----> H;
+I{package <b>netip</b>} ----> E;
+G ----> J[Id: <br> <i>uint16]
+G ----> K[RCode: <br> <i>int]
+G ----> L[Opcode: <br> <i>int]
+G ----> M[IsAuthoritative: <br> <i>bool]
+G ----> N(["`<b>Question</b>: <br><i> []ResourceRecord struct`"]);
+G ----> O(["`<b>Answer</b>: <br> <i> []ResourceRecord struct`"]);
+G ----> P(["`<b>Authority</b>: <br> <i>[]ResourceRecord struct`"]);
+G ----> Q(["`<b>Additional</b>: <br> <i>[]ResourceRecord struct`"]);
+G <----> R([type <b>*dns.Msg</b> <br> struct]);
+S([type <b>ResourceRecord</b> <br> struct]) ----> N;
+S ----> O;
+S ----> P;
+S ----> Q;
+A ----> S;
+T([type <b>dns.RR</b> <br> struct]) <----> S;
+U{package <b>dns</b>} ----> T;
+U ----> R;
+S ----> V[Name: <br> <i>string];
+S ----> W[Type: <br> <i>uint16];
+S ----> X[Class: <br> <i>uint16];
+S ----> Y[Value: <br> <i>string];
+S ----> Z[TTL: <br> <i>uint32];
+```
+Utilization of this struct/package hierarchy enabled us the trace the filtering `msgLoop` in `extractMessages.go`, create additional glue filters in `filters.go`, and modify a `ResourceRecord` struct helper function (along with a few other small tweaks) for the purpose of creating a revised filtering command (`extractMessagesCapstone`) that is currently used in the makefile within the `filter_results` target to:
+   - If the `--glue-only` flag is set to `true`, only the glue records (with flags to specify a DN, record type, or class of the glue record) will be extracted to a `.json.zst` file. We use this to extract `A` and `AAAA` glue records from NS queries. Relevant information (`File`: filename, `RespondingNS`: NS providing the glue records, `ProvidedWithAnswerTo`: the NS the glue record(s) are for, `GlueRecords`: the glue records) is presented in the following format:
+
+```
+{
+   "File": "YoDNS_output/Output_1_DN/data/output_00000000_cda549f0.pb.zst",
+   "RespondingNS": [
+         "a2.info.afilias-nst.info."
+   ],
+   "ProvidedWithAnswerTo": "info.afilias-nst.org.",
+   "GlueRecords": [
+      {
+               "Name": "b0.info.afilias-nst.org.",
+               "Type": 1,
+               "Class": 1,
+               "TTL": 86400,
+               "Value": "199.254.48.1"
+      }
+   ]
+}
+```
+   - If glue records are not being searched for (such as when we extract `A` and `AAAA` authoritative records), only this information (`File`, `RespondingNS`, `Answer`) is provided in the following format:
+
+```
+{
+   "File": "YoDNS_output/Output_1_DN/data/output_00000000_cda549f0.pb.zst",
+   "RespondingNS": [
+         "b0.info.afilias-nst.info."
+   ],
+   "Answer": [
+      {
+               "Name": "b0.info.afilias-nst.org.",
+               "Type": 1,
+               "Class": 1,
+               "TTL": 86400,
+               "Value": "199.254.48.1"
+      }
+   ]
+}
+```
 
 
 
