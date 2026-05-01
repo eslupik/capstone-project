@@ -80,49 +80,85 @@ We carefully learned how to use the YoDNS measurement tool by analyzing its inst
    1. We began by reading all information provided in the [YoDNS GitHub repository](https://github.com/DNS-MSMT-INET/yodns) and descriptions of Struer et al. [2025]'s [published dataset](https://edmond.mpg.de/dataset.xhtml?persistentId=doi:10.17617/3.UBPZXP).
    2.  The GitHub repository, paper, along with other source materials on stale glue records and dangling CNAMEs were put into a NotebookLM notebook, which was used to help describe different functionalities of the codebase to help plan out small-scale experiments.
    3.  After installation of Go and YoDNS on two cs.colgate servers (Caspian and Malayan), an example makefile to run a simple resolution of one domain was identified and run, producing sample output in `.json` format.
-   4.  We learned how to mimic 
-
-
-
-- How to use different command to produce betetr result
-- How to change the configuration to align YoDNS closely with our goal
-
----
-
-### 3.4. Studied the structure of YoDNS output
-
-We examined the JSON output and separated the main parts:
-
-- `Domains`: the original target domains
-- `Zonedata`: the DNS zone / nameserver dependency tree reconstructed by YoDNS
-- `Messages`: the raw query-response log for the actual DNS lookups performed during the run
-
-We also confirmed that `Messages` is not ordered like a simple human-readable recursive trace. Instead, it behaves more like a log of concurrent tasks, which explains why the message order may appear to jump between different zones and names.
+   4.  We learned how to mimic the format of the makefile/write our own makefile to conduct configuration experiments on sample input DN lists and eventually the current largest `subfinder_candidates.csv` input list.
+      - We created a capstone_test target to test variations of configuration changes to our modified `runconfig_capstone.json5` file (located in the `capstone-project/config/capstone_config` directory), which changed parameters of the example `runconfig.json5` file meant for large-scale scans (a copy is located in the `capstone-project/config/example_hardcore_config` directory) to match the description of parameters from the Steurer et al. [2025] paper, such as:
+          -  Changing max `CNAM`E depth to 64
+          -  Changing `MX`-followup to `true` to trace down `MX` records
+          -  Ensuring all `NS` IPs are queried
+          -  Changing input/output file directories
+          -  Ensuring output files are in `.pb.zst` format to reduce space
+   5.  Eventually, we created an efficient configuration for a large-scale scan that could be run using the makefile, and produced output in both `.pb.zst` and `.json` format using the `convertFormat` command to visually inspect the output format.     
 
 ---
 
-### 5. Learned how to read `Messages`
+### 3.4. Studied the Structure of YoDNS output
+_Task leader: Emma_
 
-We analyzed multiple examples and learned how to interpret:
+We examined the `.json` output and identified the main components/objects containing the response:
+
+- `Domains`: A list of the original target domains scanned
+- `Zonedata`: the full DNS zone / nameserver dependency tree reconstructed by YoDNS
+- `Messages`: the raw query-response log for the actual DNS lookups performed during the run, detailing all query, answer, and metadata information
+   - _We also confirmed that `Messages` is not ordered like a simple human-readable recursive trace. Instead, it behaves more like a log of concurrent tasks, which explains why the message order may appear to jump between different zones and names._
+
+---
+
+### 3.5. Learned how to read `Messages`
+_Task leader: Emma_
+
+As the majority of information is contained in the `Messages` objects, including authoritative and glue records, we analyzed multiple examples and learned how to interpret its subsections:
 
 - `OriginalQuestion`
 - `NameServerIP`
 - `ResponseAddr`
 - `Metadata`
-- `Message.Answer`
-- `Message.Authority`
-- `Message.Additional`
+- `Message`
+   - `RCode`
+   - `IsAuthoritative`
+   - `Question`
+   - `Answer`
+   - `Authority`
+   - `Additional`
 - `Error`
+We identified that, in order to identify dangling records, we needed to get access to information within the `Message` itself:
+- For example, to identify stale glue records, we wanted to find messages with `RCode`s of 1 (`A`) and 28 (`AAAA`) from authoritative name servers to compare all glue records for those domains to so that we may determine which are stale. However, how do we filter out all of the information less useful for our aims? Additionally, these `.json` files are HUGE; if we parsed the entirety of each output file via just looping in a python script, we wouldn't be able to scale our method up to a significantly larger number of input domains (10k or 1M). 
 
-We also learned how to distinguish:
-
-- authoritative `NODATA` responses
-- infrastructure lookups
-- referral-style responses
-- timeout and retry behavior
 ---
 
-### 6. Designing the stale glue workflow
+### 3.6. Extracting Relevant `Messages.Message` Components to ID Stale Glue Records
+
+#### 3.6.a. Extracting messages and utilizing provided YoDNS code
+As Steurer et al. [2025] scanned 812M domains over the course of 40 days, we positied that the large `yodns`codebase cloned from the GitHub repository would contain some built-in (efficient) methods for reading our binary output messages encoded using `protobuf` and filtering that output effectively. As such, we began to explore the provided yodns commands and their underlying code/data structures.
+
+There are 20 commands listed on the `yodns/yodns --help` page, but most are very vaguely described, and, as they are written in Golang, they took significant research and experimentation to dissect. Commands of interest for our purposes included:
+1. `scan`: We were already using it to conduct the YoDNS test scans
+2. `convertFormat`: We had already used it to examine `.json` output format
+3. `validate`: The sample makefile uses it, but its exact function was uncertain
+4. `stats`: Seemed to provide some sort of statistics/metrics in regards to the scan's success
+5. `bucketize`: Seemed to organize output files into zone "buckets" for file optimization and organization of future analysis
+6. `mergeFiles`: Seemed to organize scan output files of various sizes to a standard size
+7. `extractMessages` and `extractMessagesBinary`: These seemed like the most likely candidates for filtering for specfic record types, and as such were focused on.
+
+**Commands we use:**
+_We managed to run/ran these commands in our makefile_
+1. `scan`
+2. `convertFormat` (optional command we provide for viewable `.json` output files that are stored in a folder titled `YoDNS_output/Output_<#>_DN/json`)
+3. `validate` _(optional command that allows us to check if YoDNS worked and see any errors that occured during resolution)_
+4. `stats` _(optional command that allows us to see every target DN resolved in a specific output file, ending with a total number of DNs resolved, total messages and optional tagged DN counts)_
+5. `extractMessages`: This command allowed us to filter YoDNS `json` output messages for specific `RCode` types and from only authoritative servers, which was our first step towards filtering the YoDNS output data for our specific goals.
+
+_However, we did not feel like `extractMessages` was adequate, as large quantities of data we had no intention of using (Domain lists, Zonedata, and Message metadata) was still "clogging up" these large `.json` extracted output files. As a result, we looked into the underlying structure of the Go code for this command (located in `yodns/yodns/cmd/extractMessages.go` and a variety of other folders)..._
+
+#### 3.6.b. Learn about the YoDNS struct system and using it to create our own modified message filtering command
+
+
+
+
+
+
+---
+
+
 
 Our current stale glue workflow is:
 
