@@ -503,6 +503,21 @@ This type of issue is called **subdomain takeover**.
 
 However, when we later re-ran `dig` on this endpoint, it returned `NOERROR`. This means Magnite likely restored or updated the record. Therefore, the problem appears to have been real but temporary. It also suggests that Magnite's infrastructure team may have noticed and fixed the issue.
 
+
+#### Limitations
+
+There are several limitations in our final analysis.
+
+First, the number of flagged CNAME misconfiguration cases and dangling cases is very small. We only found 9 possible misconfiguration cases and 1 dangling CNAME candidate. Because the sample size is limited, our results may not cover all possible types of CNAME-related problems. There may be other categories of misconfiguration that did not appear in our dataset.
+
+Second, even if we had a much larger number of misconfiguration cases, it would still be difficult to classify every conflicting CNAME case perfectly using only hardcoded rules. Different CNAME targets do not always mean there is a real mistake. They may be caused by normal traffic management, load balancing, geographic routing, infrastructure migration, or temporary DNS updates. Because of this, simple rule-based classification can easily produce false positives or miss more subtle cases.
+
+A possible direction for future work is to use machine learning or statistical classification methods to help categorize CNAME conflicts at scale. For example, a model could learn patterns from known cases of traffic management, migration, and real misconfiguration, and then assign confidence scores to new cases. This would make large-scale analysis more flexible than manually writing rules for every possible situation.
+
+Finally, DNS is highly dynamic. Records can change quickly because of TTL expiration, infrastructure updates, or cloud resource changes. A domain that appears dangling at one moment may be fixed later, and a domain that appears safe now may become dangling in the future. Therefore, our results should be understood as a snapshot of DNS behavior during the time of measurement, not a permanent conclusion.
+
+
+
 ---
 
 ### Stale Glue Records
@@ -511,17 +526,6 @@ To be done.
 
 ---
 
-## 7.Future Directions
-
-If we were to continue with this project, our next steps would be...
-
-1. Continue improving the preprocessing pipeline and candidate quality, we still need more data.
-3. Learn how to process binary output
-2. Write code to automatically extract candidate domains with `NS` records from `Zonedata`.
-3. Parse `Messages` to identify referral responses and collect raw glue from `Additional` sections.
-4. Extend the pipeline later for bad or dangling CNAME analysis.
-
----
 ## References
 
 [1] Florian Steurer, Anja Feldmann, and Tobias Fiebig. 2025. A Tree in a Tree: Measuring Biases of Partial DNS Tree Exploration. In Passive and Active Measurement: 26th International Conference, PAM 2025, Virtual Event, March 10–12, 2025, Proceedings. Springer-Verlag, Berlin, Heidelberg, 106–136. https://doi.org/10.1007/978-3-031-85960-1_5
