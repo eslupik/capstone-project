@@ -57,7 +57,8 @@ _The goal of this stage was to avoid running YoDNS blindly on arbitrary names an
 
 ### 3.2. We Implemented a Subdomain Collection with Subfinder
 _Task leader: Chenyun_
-Path= `data_preprocess/prepare_subfinder_data.pyNOERROR`
+
+Path= `data_preprocess/prepare_subfinder_data.py`
 
 **We wrote preprocessing code to automate the following steps:**
    1. Read root domains from input CSV files
