@@ -388,13 +388,53 @@ In order to replicate a YoDNS scan and analysis for stale glue and dangling CNAM
    Path: `YoDNS_output/Output_9295_DN/results`
  
 ---
-## 6.Final results analysis( outdated CNAME and glue records)
+
+
+## 6. Final Results Analysis (Outdated CNAME and Glue Records)
+
+### Dangling CNAMEs
+
+From 9295 subdomains, we extracted 2605 unique CNAME chains, among which we identified 9 misconfiguration cases and 1 dangling CNAME candidate. The extremely low incidence of problematic CNAMEs is not surprising, and is in fact expected given our methodology.
+
+In the data-preprocessing stage, we only retained candidates whose endpoints returned a clean DNS status via `dig` — filtering out any that produced `NXDOMAIN`, `SERVFAIL`, `TIMEOUT`, or similar failure codes. This means the straightforward class of dangling CNAMEs — where the endpoint domain has simply been deleted or expired — was already excluded from our dataset by design. Specifically, in the normal dangling case: if `A CNAME B`, and `B`'s underlying resource record has been removed or its domain has lapsed, a standard `dig A` will follow the chain to `B` and return `NXDOMAIN` making the dangling condition immediately and trivially detectable.
+
+What we are interested in, instead, is the more subtle class of dangling CNAMEs that evade simple `dig`-based detection but can be surfaced by a full-tree DNS lookup such as **YoDNS**. These arise primarily from nameserver-level misconfiguration. Consider the following scenario: `NS_1` resolves `A CNAME B`, while `NS_2` resolves `A CNAME C`. The inconsistency itself already constitutes a misconfiguration — the same domain has divergent CNAME targets across authoritative nameservers. Now suppose `C` has been decommissioned but its DNS record was never cleaned up. A standard `dig` query, depending on which nameserver it happens to reach, may consistently be routed to `B` (which
+resolves correctly) and never expose the broken path through `C`. The dangling condition is thus latent and load-path-dependent. Only a tool that exhaustively queries all authoritative nameservers and reconstructs the full resolution tree can reliably surface this class of vulnerability.
+
+#### Analysis of Detected results
+Among the 9 flagged misconfiguration cases, closer inspection reveals that the majority are not genuine misconfigurations. Our script flags a domain as misconfigured whenever it observes the same name mapping to two different CNAME targets across different DNS records — but as we will show, this can happen for entirely legitimate reasons. We categorize the 9 cases below.
+
+1. Category 1: Anycast (False Positives)
+   Unlike a normal CNAME that always points to exactly one fixed target, a traffic-managed domain is designed to return different answers to different resolvers — routing each user to the nearest or least-loaded backend. When our script collects DNS responses from many vantage points and sees the same domain resolve to two different targets, it cannot tell whether this is a mistake or a routing policy. It flags all of them.
+
+   For example, `manage-pe.trafficmanager.net` returns three different targets across `westus`, `eastus`, and `centralus` — classic geographic routing where each region's resolvers get directed to the nearest backend.
+
+2. Infrastructure Migration
+   A second class of apparent misconfigurations arises when an organization is in the middle of migrating from one infrastructure setup to another. During the transition, the old DNS record and the new DNS record may temporarily coexist on different nameservers. This window can last minutes or days depending on TTL. 
+   For example, `cdn.awehunt.com` points to either an Alibaba OSS bucket (`oss-cn-beijing.aliyuncs.com`) or an Alibaba CDN endpoint (`cdngslb.com`) — a classic pattern of migrating from direct object-storage hosting to a CDN layer.
+   These cases are ambiguous. Under normal cases they resolve correctly because most resolvers will get one consistent answer, but the inconsistency itself indicates a window of risk. If the old target were to become dangling before the migration completes(TTL too long), it would be very difficult to detect.
+
+3. Genuine Misconfiguration
+   `www.solarmagazine.nl` is the one case that looks like an actual mistake. Its two conflicting CNAME targets are `solar-vps.slcloud.nl` (a VPS host) and `solarmagazine.nl` — the apex domain itself. This is a problem because, per DNS standards (RFC 1034), a zone apex cannot be a CNAME target — the root of a domain must have SOA and NS records, which are incompatible with being an alias. A www record that resolves to the apex will behave unpredictably across different resolvers, some of which will return an error and others of which will attempt to follow the chain anyway.
 
 
 
 
 
-## Future Directions
+
+### Stale Glue
+
+
+
+
+
+
+
+
+---
+
+
+## 7.Future Directions
 
 If we were to continue with this project, our next steps would be...
 
