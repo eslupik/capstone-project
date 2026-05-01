@@ -277,9 +277,25 @@ In order to replicate a YoDNS scan and analysis for stale glue and dangling CNAM
    - Specify `fileSize` (the number of DN resolutions per output file)
         - For example, if you are scanning 1,000,000 DNs with 250 parallel files and a file size of 1000, 250 output files will be created and filled a total of four consecutive times before the scan is complete.
    - While specified within the target `run_scan`, as this parameter was adequate for the server, the `--threads` flag can be used to set the max threads used for the scan.
-   2. 
-     
+2. Comment/uncomment optional commands in `run_scan`: the lines running the `validate` and `convertFormat` commands.
+   - For larger scans, we advise against converting to `.json` format due to the large file sizes!
+3. Once parameters are set, either:
+   a) In the `capstone-project` directory, run the `make pipeline` command to run each element of the YoDNS capstone measurement in order.
+   b) Run each target in order (`make run_scan` --> `make filter_results` --> `make filter_results_CNAME` --> `make analyze_results`) to verify successful completion of each target and ensure that (for larger scans) disk space is available.
+4. Where to locate results:
 
+   **run_scan Results:**
+   - `/YoDNS_output/Output_<#>_DN/data`: raw compressed binary `.pb.zst` output files
+   - `/YoDNS_output/Output_<#>_DN/validate`: validation output for each file, `.json.zst` format
+   -  `/YoDNS_output/Output_<#>_DN/stats`:stats output for each file, `.json.zst` format
+  
+   **filter_results Results:**
+   - `/YoDNS_output/Output_<#>_DN/filtered`: filtered records for authoritative `A` and `AAAA` records, glue records, and `CNAME` records in `.json.zst` format, all in appropriately named subfolders.
+  
+   **analyze_results Results:**
+   - `/YoDNS_output/Output_<#>_DN/results/stale_glue`:
+        - A `.csv` file containing every identified stale glue IP and its corresponding DN and record type.
+        - A `.txt` file (brief report) detailing the total frequency of stale glue records and numbers of unique DNs and IPs involved.
 
 ---
 
@@ -313,5 +329,10 @@ If we were to continue with this project, our next steps would be...
 
 ---
 ## References
+
+[1] Florian Steurer, Anja Feldmann, and Tobias Fiebig. 2025. A Tree in a Tree: Measuring Biases of Partial DNS Tree Exploration. In Passive and Active Measurement: 26th International Conference, PAM 2025, Virtual Event, March 10–12, 2025, Proceedings. Springer-Verlag, Berlin, Heidelberg, 106–136. https://doi.org/10.1007/978-3-031-85960-1_5
+
+
+[2] Yunyi Zhang, Baojun Liu, Haixin Duan, Min Zhang, Xiang Li, Fan Shi, Chengxi Xu, and Eihal Alowaishcq. 2024. Rethinking the security threats of stale DNS glue records. In Proceedings of the 33rd USENIX Conference on Security Symposium (SEC '24). USENIX Association, USA, Article 71, 1261–1277. https://www.usenix.org/system/files/usenixsecurity24-zhang-yunyi-rethinking.pdf
 
 
