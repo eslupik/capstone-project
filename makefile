@@ -3,7 +3,7 @@ date=$(shell date +%F-%H-%M)
 runDir=${date}_${rev}
 
 # General parameters: please change for every test
-Num_DNs = 5099
+Num_DNs = 9295
 
 # Scan parameters: check before running the scan commands
 configSubDir = capstone_config
@@ -95,7 +95,11 @@ analyze_results: build
 	# Process filtered auth and glue record json files to identify stale glue records
 	python3 ${CURDIR}/data_processing/process_glue.py ${Num_DNs}
 
-
+analyze_cname:
+	mkdir -p ${folder}/results/dangling_cname
+	python3 ${CURDIR}/data_processing/process_cname.py \
+		--cname-dir=${folder}/filtered/CNAME_REC \
+		--output-dir=${folder}/results/dangling_cname
 
 #The old way of doing things...
 extract_messages: build	

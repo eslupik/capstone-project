@@ -1,0 +1,10 @@
+domain,conflicting_values
+api.dv15.gdlservices.nl.,gdl-apii2-dv-api-1717505265.eu-central-1.elb.amazonaws.com. | gdl-dv15-api-public-alb-1724818596.eu-central-1.elb.amazonaws.com.
+acdcatm.autodiscover.mira.tm.svc.cloud.microsoft.,atm.autodiscover.mira.tm.svc.cloud.microsoft. | autod.ms-acdc-autod.office.com.
+acdcatm.outlook.mira.tm.svc.cloud.microsoft.,atm.outlook.mira.tm.svc.cloud.microsoft. | outlook.ms-acdc.office.com.
+st.edge.viginia.edge2.salesforce.com.,st1.edge.sfdc-8tgtt5.edge2.salesforce.com. | st1.edge.sfdc-yfeipo.edge2.salesforce.com.
+azurestaticapps5.trafficmanager.net.,msha-slice-5-eus2-0.msha-slice-5-eus2-0-ase.p.azurewebsites.net. | msha-slice-5-eus2-1.msha-slice-5-eus2-1-ase.p.azurewebsites.net.
+production-v2-tm-dns.trafficmanager.net.,production-v2-app-01-dns-name.francecentral.cloudapp.azure.com. | production-v2-app-02-dns-name.francecentral.cloudapp.azure.com.
+manage-pe.trafficmanager.net.,pexsucpna01.westus.cloudapp.azure.com. | pexsucpna02.eastus.cloudapp.azure.com. | pexsucpna03.centralus.cloudapp.azure.com.
+www.solarmagazine.nl.,solar-vps.slcloud.nl. | solarmagazine.nl.
+cdn.awehunt.com.,awehunt.oss-cn-beijing.aliyuncs.com. | cdn.awehunt.com.w.cdngslb.com.
