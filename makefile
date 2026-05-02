@@ -121,7 +121,6 @@ analyze_results: build
 	# Process filtered auth and glue record json files to identify stale glue records
 	python3 ${CURDIR}/data_processing/process_glue.py ${Num_DNs}+${Batch}
 
-	mkdir -p ${folder}/results/dangling_cname
 	python3 ${CURDIR}/data_processing/process_cname.py \
 		--cname-dir=${folder}/filtered/CNAME_REC \
 		--output-dir=${folder}/results/dangling_cname
@@ -216,11 +215,7 @@ pipeline_batch:
 	$(MAKE) merge_results
 
 
-#PREVIOUS TESTS/METHODS_____________________________________________________________________________________________	mkdir -p ${folder}/results/dangling_cname
-	python3 ${CURDIR}/data_processing/process_cname.py \
-		--cname-dir=${folder}/filtered/CNAME_REC \
-		--output-dir=${folder}/results/dangling_cname
-
+#PREVIOUS TESTS/METHODS______________________________________________________________________________________________________________
 
 #The old way of doing things...
 extract_messages: build	
