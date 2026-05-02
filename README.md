@@ -266,14 +266,31 @@ Now equipped with simple, filtered records, we learned how to parse through `.js
   
 _While simple, this script seems to correctly identify stale glue records encountered during a YoDNS scan, thus fufilling our first objective._
 
+#### Batching strategies for large input datasets
+
+To expand our ability to detect stale glue records on a larger scale, our next step was to figure out how to scale up our program, or at least run it safely in increments. When beginning to test scaling strategies, we ran into the issues of creating so many output files that the cs.colgate server’s disk filled; through significant trial-and-error (and a LOT more file compression), we determined that adding the option for batching output files would be beneficial, as this enabled us to:
+Test large scale experiments/filtering/analysis on a smaller scale beforehand using a subset of its output files.
+To have time to analyze filtered output files and delete raw data before continuing with the experiment; filtering the entirety of the raw `.pb.zst` output files when they are in the thousands can overload the disk. 
+To eventually use batching to automate the scanning/processing of large input files in a way that is safer and does not result in significant loss and the need to redo filtering procedures if something fails/goes awry.
+
+While developing and testing batching for the Tranco 1M experiment, we developed two formats:
+Provide the option to specify a batch range so that we can utilize the original pipeline but run it multiple times, storing batched output files in numbered subfolders.
+Provide the alternative option to run a “batched” experiment wherein scan output folders are automatically moved into batched subfolders and analyzed in those batches.
+A merge_results python script that takes the statistics and inconsistent IP analysis output files for individual batches and merges them together to get representative statistics for the entire scan.
+This file is located in `capstone-project/data-processing/merge_files.py` and can be run using the `make merge_files` target in the `makefile`.
+
+_What we learned: challenges of batch processing_
+The organizational challenge of creating a batched pipeline was quite difficult to integrate with our existing pipeline and took significant research on `makefile` syntax. GenAI was used throughout this learning and debugging process, and (where appropriately cited) helped generate/modify specific code snippets in the makefile to help integrate batching functionality.
+
+A limitation of this newer analysis and merging code added to facilitate batching is that, in its current state, it is not the most versatile for analyzing anything other than stale glue records. Originally, it was the intention to make the analysis and merging scripts able to process any type of/range of DNS record types to aid in dangling CNAME identification, but we encountered difficulty with establishing this versatility under the project time constraints. Currently, batching functionality and merging of analysis output files only is applicable to the search for `A`  and `AAAA` stale glue records, but, if we were continuing this project further, we would extend this functionality to CNAME identification. 
+
+
 ---
 ### 3.8. Extracted Relevent Records for Dangling CNAME Identification
 _Task leader: Chenyun_
 Path: `YoDNS_output/Output_9295_DN/filtered/CNAME_REC`
 
 The information we needed from the raw YoDNS output was relatively simple: we only needed authoritative CNAME records. In DNS, CNAME records have rtype == 5, and authoritative answers are marked with the AA flag. Therefore, we used our modified extractMessagesCapstone command to filter the raw output and extract all messages where rtype == 5 and the response was authoritative. These filtered records then served as the input for our later analysis of potential dangling CNAMEs.
-
-
 
 
 ---
