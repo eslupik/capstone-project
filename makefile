@@ -216,7 +216,11 @@ pipeline_batch:
 	$(MAKE) merge_results
 
 
-#PREVIOUS TESTS/METHODS_____________________________________________________________________________________________
+#PREVIOUS TESTS/METHODS_____________________________________________________________________________________________	mkdir -p ${folder}/results/dangling_cname
+	python3 ${CURDIR}/data_processing/process_cname.py \
+		--cname-dir=${folder}/filtered/CNAME_REC \
+		--output-dir=${folder}/results/dangling_cname
+
 
 #The old way of doing things...
 extract_messages: build	
