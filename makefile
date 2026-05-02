@@ -3,13 +3,13 @@ date=$(shell date +%F-%H-%M)
 runDir=${date}_${rev}
 
 # General parameters: please change/verify BEFORE every test
-Num_DNs = 10
+Num_DNs = 9295
 
 # Scan parameters: check BEFORE running the run_scan target
-inputFile = subfinder_example_${Num_DNs}.csv
-inputLen = 10 # Number of DNs to read from input .csv file
-parallelFiles = 1 # Number of output files created/written to at at time
-fileSize = 50 # Number of target DN resolutions per output file
+inputFile = subfinder_candidates_${Num_DNs}.csv
+inputLen = 9295 # Number of DNs to read from input .csv file
+parallelFiles = 25 # Number of output files created/written to at at time
+fileSize = 400 # Number of target DN resolutions per output file
 
 # Filtering/analysis parameters: check BEFORE running the run_scan target
 # If filtering for a SINGLE batch: specify end points
@@ -17,7 +17,7 @@ Batch_start = 0
 Batch_end = 1024
 
 # COMMENT OUT IF A BATCH IS NOT BEING USED!!!!
-#Batch = batch_${Batch_start}-${Batch_end}_output
+# Batch = batch_${Batch_start}-${Batch_end}_output
 # COMMENT OUT IF A BATCH IS NOT BEING USED!!!!
 
 # General parameters for MULTI-BATCHING: please change/verify BEFORE every large test; each corresponding two numbers separated by a space are ends of a range

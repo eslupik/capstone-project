@@ -14,7 +14,7 @@
 	},
 	"Input": {
 		"Path": "/home/local/slupike/capstone-project/config/capstone_config/subfinder_candidates.csv",
-		"CSVColumnIndex": 2,
+		"CSVColumnIndex": 1,
 		"CSVSeparator": ",",
 		"Offset": 1,
 		"BatchSize": 20,
@@ -22,11 +22,11 @@
 		"PSLPath": "/home/local/slupike/capstone-project/config/capstone_config/public_suffix_list.dat"
 	},
 	"Output": {
-		"FileSize": 300,
+		"FileSize": 1000,
 		"Format": "protobuf",
 		"Zip": "zst:fast",
 		"Path": "data",
-		"ParallelFiles": 25
+		"ParallelFiles": 250
 	},
 	"Caching": {
 		"InfraDumpFile": "logs/infra.json",
