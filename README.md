@@ -517,7 +517,41 @@ A possible direction for future work is to use machine learning or statistical c
 
 Finally, DNS is highly dynamic. Records can change quickly because of TTL expiration, infrastructure updates, or cloud resource changes. A domain that appears dangling at one moment may be fixed later, and a domain that appears safe now may become dangling in the future. Therefore, our results should be understood as a snapshot of DNS behavior during the time of measurement, not a permanent conclusion.
 
+### Stale Glue Records
 
+#### Results from 9295 subdomains:
+
+While Zhang et al. [2024] was able to identify that a whopping 23.18% of glue records they analyzed were outdated, results of our YoDNS scan on 9295 subdomains found a significantly smaller proportion of verified stale glue records: 
+
+```
+1. Total stale A recs: 1661/340658 (0.48759%), 11/2899 unique stale IP(s) (0.37944%) from 12/3023 unique NS names (0.39696%).
+2. Total stale AAAA recs: 9/316157 (0.00285%), 1/2144 unique stale IP(s) (0.04664%) from 1/2239 unique NS names (0.04466%).
+```
+
+A mere 0.49% of `A` glue records, stemming from only 11 unique IPv4 addresses, was identified using YoDNS, and the proportion of `AAAA` glue records is even smaller. What can account for these differences?
+
+A key consideration is the fact that significantly different strategies were employed to discover glue records; by downloading the authorized zone files for 1,096 TLDS utilizing ICANN’s CZDS, Zhang et al. [2024], they were able to collect over 2.5M glue records containing information for 975,168 SLDs. Due to the inefficiency of our process to generate subdomains using Subfinder, identifying glue records for subdomains on such a large scale was not feasible for the scope of our project. 
+
+While our approaches differed significantly, we argue that each methodology provides a unique insight into the DNS hierarchy. The technique of Zhang et al. [2024] is more experimental/controlled in design, gathering glue zone files and carefully resolving each one and determining which GlueIPs still serve their delegated domains, providing absolute information on the prevalence of stale glue records within the DNS in its entirety. However, by utilizing YoDNS we take on a more naturalistic approach, modelling the probability of a recursive resolver encountering a stale glue record in some form during a resolution at one point in time. While most DNS measurement tools engaging in opportunistic traversal provide information on just the “choices” a resolver makes in its navigation throughout the DNS, YoDNS, in a certain capacity, gives us eyes inside the DNS, modelling every bit of data the measurement tool comes into contact with during a resolution. 
+
+Additionally, while Steurer et al. [2025] did not utilize YoDNS to measure stale glue records, they did apply the tool to the identification of inconsistent A records among authoritative name servers (replicating the methodology of Izechevich et al. [2022]), and found that YoDNS was able to identify significantly more A record inconsistencies in comparison to ZDNS, a standard measurement tool utilizing opportunistic traversal of the DNS tree. While more limited in its scope in comparison to Zhang et al. [2024], this result gives us hope that YoDNS is in fact an optimal measurement tool for identifying minute inconsistencies in the DNS infrastructure and has the potential to effectively allow us to quantify the magnitude of a threat stale glue records pose to DNS security.
+
+#### Results from the Tranco Top 1M:
+
+While lacking in subdomains, we decided to try to increase our output size by adjusting our experiment to analyze the Tranco Top 1M list of domains for stale glue record, to see if our stale glue prevalence identified by YoDNS would approach that of Zhang et al. [2024] when scaled up drastically. 
+
+_When the results of four batches of filtered output for 1M domains were combined (1000 target domains resolved per file, 250 files per batch, 4 batches total, individual batch results can be found in `capstone-project/YoDNS_output/Output_1000000_DN/results/indiv_results_stale_glue`), this is what we found:_
+
+```
+1. Total stale A recs: 1013751/218915337 (0.46308%), 1037 unique stale IP(s) (Avg: 0.62307%) from 1091 unique NS names (Avg: 0.50424%).
+2. Total stale AAAA recs: 20663283/208200294 (9.92471%), 82 unique stale IP(s) (Avg: 0.28324%) from 80 unique NS names (Avg: 0.22398%).
+```
+
+While scaled to a total of 200M glue records, the proportion of stale `A` glue records remained largely stable at 0.46%. However, the proportion of stale `AAAA` records increased to 9.92%. The precedent for `IPv6` stale glue prevalence is less established, as Zhang et al. [2024] limited their scope to `IPv4` addresses. What is most interesting about this finding is its variability between the four batches of 250,000 input domains run at a time. In two batched outputs (`Stale_Glue_Stats-1000000.txt` and `Stale_Glue_Stats-1000000_1.txt`), the percentage of stale `AAAA` records is low (<0.05%), but jumps to 19.91% and 19.94% in `Stale_Glue_Stats-1000000_2.txt` and `Stale_Glue_Stats-1000000_3.txt`, respectively. 
+
+_Why did this occur?_
+
+On closer inspection, the difference causing this jump in percentage is attributed to the frequency of stale IP glue records being recorded by YoDNS, not an increase in the proportion of unique stale IPs, which ranged between 0.4% and 0.8% by batch. After examining the stale IP frequency tables (`Stale_IP_Freq_1000000.csv`), we saw that YoDNS received a massive influx of glue records for a few specific `IPv6` addresses which bolstered the overall proportion of stale glue records. Upon cross-referencing with the stale DN table (`Inconsistent_IPs-1000000.csv`), it became evident that this is because they are all root server NSes, `*.root-servers.net`. At first, I attributed this to a failure in my analysis script, but did see numerous reports of errors trying to connect to root servers with these specific `IPv6` addresses; the WHOIS 2001:7fe::53 website even has a 201 error message in its raw output, stating that their IP was blocked for making too many requests. Why this is the case, why YoDNS did not find `AAAA` records for these root servers, and why it only occurred in specific batches of our 1M output is unknown and an interesting avenue for future analysis of our scan’s functionality, behavior, and that of the YoDNS measurement tool.
 
 ---
 
@@ -525,7 +559,9 @@ Finally, DNS is highly dynamic. Records can change quickly because of TTL expira
 
 [1] Florian Steurer, Anja Feldmann, and Tobias Fiebig. 2025. A Tree in a Tree: Measuring Biases of Partial DNS Tree Exploration. In Passive and Active Measurement: 26th International Conference, PAM 2025, Virtual Event, March 10–12, 2025, Proceedings. Springer-Verlag, Berlin, Heidelberg, 106–136. https://doi.org/10.1007/978-3-031-85960-1_5
 
-
 [2] Yunyi Zhang, Baojun Liu, Haixin Duan, Min Zhang, Xiang Li, Fan Shi, Chengxi Xu, and Eihal Alowaishcq. 2024. Rethinking the security threats of stale DNS glue records. In Proceedings of the 33rd USENIX Conference on Security Symposium (SEC '24). USENIX Association, USA, Article 71, 1261–1277. https://www.usenix.org/system/files/usenixsecurity24-zhang-yunyi-rethinking.pdf
+
+[3] Liz Izhikevich, Gautam Akiwate, Briana Berger, Spencer Drakontaidis, Anna Ascheman, Paul Pearce, David Adrian, and Zakir Durumeric. 2022. ZDNS: a fast DNS toolkit for internet measurement. In Proceedings of the 22nd ACM Internet Measurement Conference (IMC '22). Association for Computing Machinery, New York, NY, USA, 33–43. https://doi.org/10.1145/3517745.3561434
+
 
 
