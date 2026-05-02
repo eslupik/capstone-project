@@ -392,10 +392,11 @@ In order to replicate a YoDNS scan and analysis for stale glue and dangling CNAM
 
 ## 5.Current Results/Artifacts
 
-### 1. run_scan and filter_results makefile functions
-- Both present in the `makefile` within the main repository folder, in addition to earlier experiments, the makefile allows you to:
+### 1. run_scan, filter_results, and analyze_results makefile functions
+- All present in the `makefile` within the main repository folder. In addition to earlier experiments, the makefile allows you to:
      A) Run YoDNS scans on any example dataset and place results in any output folder, with options to run commands for scan validation and scan statistics to ensure scan success.
      B) Filter binary YoDNS output file messages for authoritatative A and AAAA records, along with all NS records.
+     C) Analyze the output data for stale glue records and dangling CNAMEs
 
 ### 2. Output files for scans of varying sizes
 - Present in subfolder the `YoDNS_output` folder, all raw YoDNS scan output is accessible in zipped binary (in `Output_#_DN/data`, `output_#.pb.zst` format) and json format (zipped or unzipped depending on file size, in `Output_#_DN/json`, `output_#.json.zst` or `output_#.json` format).
@@ -411,6 +412,10 @@ In order to replicate a YoDNS scan and analysis for stale glue and dangling CNAM
 
 ### 4. Final results from scanning 9295 candidates
    Path: `YoDNS_output/Output_9295_DN/results`
+
+### 5. Final results from scanning the Tranco Top 1M list (glue records identified)
+   *Note: due to size issues (40GB of issues that GitHub wasn't very fond of, to be exact, the raw binary output files and logs were deleted but the scan can be redone easily via the makefile (time estimation: 1-2 hours).
+   Path: `YoDNS_output/Output_1000000_DN/results`
  
 ---
 
