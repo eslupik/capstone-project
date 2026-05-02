@@ -5,7 +5,12 @@ import ast
 # 1. Read in .csv file
 def read_csv(filename, csv_type):
     #Dictionary for storing DNs with ID numbers for debugging and 
-    csv_dict = {}
+    csv_dict_F = {}
+    csv_dict_A = {}
+    csv_dict_AAAA = {}
+
+    A_ct = 0
+    AAAA_ct = 0
     
     with open(filename, newline = '') as csvfile:
         to_read = csv.reader(csvfile, delimiter=',')
@@ -14,16 +19,19 @@ def read_csv(filename, csv_type):
 
         for row in to_read:
             match csv_type:
-                case 'Top DN':
-                    csv_dict[row[0]] = row[1]
+                case 'Freq':
+                    csv_dict_F[row[0]] = int(row[1])
 
-                case 'Records':
-                    # csv_set = ()
-                    # print(row[1])
-                    # csv_set.update(row[1::])
-                    csv_dict[row[0]] = set(ast.literal_eval(row[1]))
+                case 'Incon':
+                    rec_type = row[2]
+                    match rec_type:
+                        case 'A':
+                            csv_dict_A[row[0]] = set(ast.literal_eval(row[1]))
+                        case 'AAAA':
+                            csv_dict_AAAA[row[0]] = set(ast.literal_eval(row[1]))
+                    
             
-    return csv_dict
+    return csv_dict_F, csv_dict_A, csv_dict_AAAA
 
 # print(read_csv('ASN_Records_DN-50.csv', 'Records'))
 

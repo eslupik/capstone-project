@@ -1,141 +1,402 @@
-# YoDNS Project Progress
+# Capstone Project: Utilizing YoDNS to Identify Dangling Records
 
-## Project Goal
+## 1. Project Goal
 
-This project uses **YoDNS** to study DNS infrastructure issues, especially:
+This project uses **YoDNS**, a unique measurement toolchain, to study and identify the prevalence of DNS infrastructure issues, specifically:
 
-- **stale glue records**
-- **bad / stale / dangling CNAMEs**
+- **Stale glue `A` and `AAAA` records**
+- **Stale / dangling `CNAME` records**
 
-Our goal is not just to get final DNS answers such as `A`, `NS`, or `CNAME`, since ordinary `dig` can already do that. Instead, we use YoDNS to analyze DNS dependency structure and the query process at scale.
-
----
-
-## Project Pipeline Overview
-
-Our workflow currently has two major stages:
-
-1. **Data preprocessing**
-   - start from the **Tranco Top 10K**
-   - use **Subfinder** to discover subdomains
-   - filter and prepare candidate domains for later DNS analysis
-
-2. **YoDNS analysis**
-   - run YoDNS on the prepared candidate set
-   - study `Zonedata` and `Messages`
-   - extract glue-related information and identify stale-glue candidates
+Our goal is not just to measure final DNS answers for records such as `A`, `NS`, or `CNAME` records, since ordinary `dig` can already do that. However, typical resolvers utilize optimization strategies such as caching to reduce query load, and as such may not accurately capture the reality of DNS structure by not engaging in full DNS tree traversal [1]. Instead, we use YoDNS, designed by Steurer et al. [2025], to analyze DNS dependency structure and the query process at scale.
 
 ---
 
-## What We Have Done So Far
+## 2. Project Pipeline
 
-### 1. Built the data preprocessing stage
+### Structural Overview:
 
-Before using YoDNS, we first worked on building a candidate dataset from the **Tranco Top 10K**.
+Our methodology has three major stages:
 
-Our preprocessing pipeline is:
+1. **Data preprocessing**: Preparing an input database for efficient scanning by YoDNS
+   - Start from the **Tranco Top 10K** list of domains.
+   - Use **Subfinder** to discover subdomains from this list.
+   - Filter and prepare candidate domains for later DNS analysis.
 
-- take root domains from the Tranco 10K dataset
-- sample or iterate through selected root domains
-- use **Subfinder** to discover subdomains for each root domain
-- use DNS queries to filter discovered names
-- save usable candidates into output files for later YoDNS analysis
-
-The goal of this stage is to avoid running YoDNS blindly on arbitrary names and instead prepare a cleaner and more relevant set of domains and subdomains. Since stale DNS issues, such as dangling CNAMEs and other stale dependencies, are more likely to appear in deeper operational subdomains, relying only on Tranco would likely cause us to miss many relevant cases.
+2. **YoDNS scanning**
+   - Run a YoDNS scan on the prepared candidate set.
+   - Store output efficiently.
+   - Study the components of the output (in json format for visualization), namely its `Zonedata` and `Messages`.
+  
+3. **Dangling record extraction and analysis**
+   - Extract glue-related information:
+        - All NS response glue records containing IP addresses (`A`: `IPv4`, and `AAAA`: `IPv6`)
+        - All authoritative `A` and `AAAA` records for those domains
+   - Identify stale-glue candidates by comparing these records and quantify their prevalence/how frequently YoDNS encountered them.
+   - Extract CNAME-related information and identify candidates for dangling CNAME records
 
 ---
 
-### 2. Implemented subdomain collection with Subfinder
+## 3. Our Approach / What we Accomplished
+_...and learning along the way_
 
-We wrote preprocessing code to automate the following steps:
+### 3.1. We Built the Data Preprocessing Stage
+_Task leader: Chenyun_
 
-- read root domains from input CSV files
-- sample a subset of root domains when needed
-- run **Subfinder** on each root domain
-- collect discovered subdomains
-- test whether each discovered name has meaningful DNS results
+Before using YoDNS, we first worked on building a candidate dataset from the **Tranco Top 10K** to be used as an input `.csv` file for the scan.
+
+**Our preprocessing pipeline is:**
+   1. Take root domains from the Tranco 10K dataset
+   2. Sample or iterate through selected root domains
+   3. Use **Subfinder** to discover subdomains for each root domain
+   4. Use DNS queries to filter discovered names
+   5. Save usable candidates into output files for later YoDNS analysis
+
+_The goal of this stage was to avoid running YoDNS blindly on arbitrary names and instead prepare a cleaner and more relevant set of domains and subdomains. Since stale DNS issues, such as dangling CNAMEs and other stale dependencies, are more likely to appear in deeper operational subdomains, relying solely on Tranco would likely cause us to miss many relevant cases._
+
+---
+
+### 3.2. We Implemented a Subdomain Collection with Subfinder
+_Task leader: Chenyun_
+
+Path= `data_preprocess/prepare_subfinder_data.py`
+
+**We wrote preprocessing code to automate the following steps:**
+   1. Read root domains from input CSV files
+   2. Sample a subset of root domains when needed
+   3. Run **Subfinder** on each root domain
+   4. Collect discovered subdomains
+   5. Test whether each discovered name has meaningful DNS results
 
 We also designed the code to distinguish between:
 
-- **accepted candidates**: domains with usable DNS results, but some of them are very intertsing though, where its dns status is NOERROR but returned result is null.
-- **excluded candidates**: domains with unhelpful, empty, or invalid results
+- **Accepted candidates**: Domains with usable DNS results.
+- **Excluded candidates**: Domains with unhelpful, empty, or invalid results.
+   - Some of them are very interesting though, for example where a candidate's dns resolution status is `NOERROR` but  the returned result is `null`.
 
+**About Subfinder:**
+At the beginning of our subdomain collection process, we used CT logs, which contain public records of issued SSL/TLS certificates. However, we later realized that CT logs were not practical for our pipeline. The main limitation was their strict rate limits, which made it difficult to collect a large amount of data efficiently. Even though CT log services provide APIs that can be integrated into scalable scripts, the rate limits significantly slowed down our data collection process. Another issue was that the data from CT logs contained too much noise. Many certificates are wildcard certificates, such as *.example.com, and expanding them does not necessarily produce real, existing subdomains.
 
----
+Therefore, we decided to use Subfinder instead. I first learned about this tool through Kali Linux. It is a useful subdomain discovery tool because it combines multiple data sources, including DNS brute-force enumeration, passive DNS, and intelligence platforms. We used Subfinder with its default configuration, without any API keys or additional service integrations. Subfinder was invoked via command line with the -silent and -d flags, relying solely on its built-in passive DNS enumeration sources that do not require authentication. 
 
+This setup was sufficient for our goal because we did not need to collect a large number of subdomains from a single root domain. In fact, we wanted to avoid that situation. If too many candidate subdomains come from the same second-level domain, there may be a large amount of zone overlap in the final dataset(YoDNS result). This would reduce the diversity of the domains we analyze and make the results less representative. 
 
-### 3. Learn how to use YoDNS
+**important things we learned:**
 
-We carefully learn how to use YoDNS by reading its instruction and doing lots of experiment:
+   1. At first, We was concerned that subdomain collection might raise security concerns. However, we later learned that Subfinder, under its default configuration, primarily relies on passive subdomain enumeration. In other words, it does not actively probe the target domain by sending DNS queries directly to it. Instead, it gathers publicly available subdomain information from existing Internet sources. This made Subfinder more appropriate for our pipeline, because it allowed us to collect candidate subdomains while minimizing unnecessary traffic toward the target domains.
 
-- How to use different command to produce betetr result
-- How to change the configuration to align YoDNS closely with our goal
-
----
-
-### 4. Studied the structure of YoDNS output
-
-We examined the JSON output and separated the main parts:
-
-- `Domains`: the original target domains
-- `Zonedata`: the DNS zone / nameserver dependency tree reconstructed by YoDNS
-- `Messages`: the raw query-response log for the actual DNS lookups performed during the run
-
-We also confirmed that `Messages` is not ordered like a simple human-readable recursive trace. Instead, it behaves more like a log of concurrent tasks, which explains why the message order may appear to jump between different zones and names.
+   2. The initial implementation was far too slow for our use case. Processing a dataset of approximately 3,000 domains took over 10 hours, which made iterating on the pipeline impractical.There were two main bottlenecks:
+      - **Sequential DNS resolution**: The original code resolved each candidate domain one at a time. Each `dig` call involves a network round-trip that typically takes anywhere from 20ms to 500ms. With up to 10k domains, the total number of `dig` calls could reach into the hundreds of thousands, all waiting sequentially. Since `dig` is IO-bound, the CPU was sitting idle for the vast majority of the runtime.
+      - **Per-row file writes**: The original code opened, wrote to, and closed the output CSV file for every single candidate row. Opening and closing a file thousands of times accumulates significant overhead over a long run.
+   
+   We addressed both issues in the optimized version. For DNS resolution, we introduced concurrent `dig` calls using Python's `ThreadPoolExecutor`, issuing up to 20 parallel requests per root domain. Since each thread spends most of its time waiting for a network response, running 20 at once costs roughly the same wall-clock time as running 1. For file writes, instead of writing after every row, we accumulate all accepted and excluded rows in memory and write them to disk in a single pass at the end, reducing thousands of file operations down to two.
 
 ---
 
-### 5. Learned how to read `Messages`
+### 3.3. We Learned How to Use YoDNS
+_Task leader: Emma_
 
-We analyzed multiple examples and learned how to interpret:
+We carefully learned how to use the YoDNS measurement tool by analyzing its instructions, researching elements of its complex codebase, and doing lots of small-scale experiments:
+   1. We began by reading all information provided in the [YoDNS GitHub repository](https://github.com/DNS-MSMT-INET/yodns) and descriptions of Struer et al. [2025]'s [published dataset](https://edmond.mpg.de/dataset.xhtml?persistentId=doi:10.17617/3.UBPZXP).
+   2.  The GitHub repository, paper, along with other source materials on stale glue records and dangling CNAMEs were put into a NotebookLM notebook, which was used to help describe different functionalities of the codebase to help plan out small-scale experiments.
+   3.  After installation of Go and YoDNS on two cs.colgate servers (Caspian and Malayan), an example makefile to run a simple resolution of one domain was identified and run, producing sample output in `.json` format.
+   4.  We learned how to mimic the format of the makefile/write our own makefile to conduct configuration experiments on sample input DN lists and eventually the current largest `subfinder_candidates.csv` input list.
+      - We created a capstone_test target to test variations of configuration changes to our modified `runconfig_capstone.json5` file (located in the `capstone-project/config/capstone_config` directory), which changed parameters of the example `runconfig.json5` file meant for large-scale scans (a copy is located in the `capstone-project/config/example_hardcore_config` directory) to match the description of parameters from the Steurer et al. [2025] paper, such as:
+          -  Changing max `CNAM`E depth to 64
+          -  Changing `MX`-followup to `true` to trace down `MX` records
+          -  Ensuring all `NS` IPs are queried
+          -  Changing input/output file directories
+          -  Ensuring output files are in `.pb.zst` format to reduce space
+   5.  Eventually, we created an efficient configuration for a large-scale scan that could be run using the makefile, and produced output in both `.pb.zst` and `.json` format using the `convertFormat` command to visually inspect the output format.     
+
+---
+
+### 3.4. Studied the Structure of YoDNS output
+_Task leader: Emma_
+
+We examined the `.json` output and identified the main components/objects containing the response:
+
+- `Domains`: A list of the original target domains scanned
+- `Zonedata`: the full DNS zone / nameserver dependency tree reconstructed by YoDNS
+- `Messages`: the raw query-response log for the actual DNS lookups performed during the run, detailing all query, answer, and metadata information
+   - _We also confirmed that `Messages` is not ordered like a simple human-readable recursive trace. Instead, it behaves more like a log of concurrent tasks, which explains why the message order may appear to jump between different zones and names._
+
+---
+
+### 3.5. Learned how to read `Messages`
+_Task leader: Emma_
+
+As the majority of information is contained in the `Messages` objects, including authoritative and glue records, we analyzed multiple examples and learned how to interpret its subsections:
 
 - `OriginalQuestion`
 - `NameServerIP`
 - `ResponseAddr`
 - `Metadata`
-- `Message.Answer`
-- `Message.Authority`
-- `Message.Additional`
+- `Message`
+   - `RCode`
+   - `IsAuthoritative`
+   - `Question`
+   - `Answer`
+   - `Authority`
+   - `Additional`
 - `Error`
-
-We also learned how to distinguish:
-
-- authoritative `NODATA` responses
-- infrastructure lookups
-- referral-style responses
-- timeout and retry behavior
----
-
-### 6. Designing the stale glue workflow
-
-Our current stale glue workflow is:
-
-1. Extract domains with `NS` records from YoDNS `Zonedata`.
-2. For each such domain, search YoDNS `Messages` for referral responses whose `Additional` section contains `A/AAAA` records for the delegated nameservers.
-3. Treat those `Additional` `A/AAAA` records as raw glue.
-4. Compare the raw glue with the nameserver IPs stored in `Zonedata`.
-5. Resolve each nameserver hostname separately to obtain its current `A/AAAA` records.
-6. If the parent-side glue differs from the current nameserver address, mark it as a **stale-glue candidate**.
+We identified that, in order to identify dangling records, we needed to get access to information within the `Message` itself:
+- For example, to identify stale glue records, we wanted to find messages with `RCode`s of 1 (`A`) and 28 (`AAAA`) from authoritative name servers to compare all glue records for those domains to so that we may determine which are stale. However, how do we filter out all of the information less useful for our aims? Additionally, these `.json` files are HUGE; if we parsed the entirety of each output file via just looping in a python script, we wouldn't be able to scale our method up to a significantly larger number of input domains (10k or 1M). 
 
 ---
 
-### 7. Investigated how to handle YoDNS binary output
+### 3.6. Extracted Relevant `Messages.Message` Components to Identify Stale Glue Records
+_Task leader: Emma_
+#### 3.6.a. Extracting messages and utilizing provided YoDNS code
+As Steurer et al. [2025] scanned 812M domains over the course of 40 days, we positied that the large `yodns`codebase cloned from the GitHub repository would contain some built-in (efficient) methods for reading our binary output messages encoded using `protobuf` and filtering that output effectively. As such, we began to explore the provided yodns commands and their underlying code/data structures.
 
-We also clarified that large-scale YoDNS analysis should ideally process the **binary protobuf output directly**, instead of converting everything to JSON first, since we already tried directly processing json data, and it is too large.
+There are 20 commands listed on the `yodns/yodns --help` page, but most are very vaguely described, and, as they are written in Golang, they took significant research and experimentation to dissect. Commands of interest for our purposes included:
+1. `scan`: We were already using it to conduct the YoDNS test scans
+2. `convertFormat`: We had already used it to examine `.json` output format
+3. `validate`: The sample makefile uses it, but its exact function was uncertain
+4. `stats`: Seemed to provide some sort of statistics/metrics in regards to the scan's success
+5. `bucketize`: Seemed to organize output files into zone "buckets" for file optimization and organization of future analysis
+6. `mergeFiles`: Seemed to organize scan output files of various sizes to a standard size
+7. `extractMessages` and `extractMessagesBinary`: These seemed like the most likely candidates for filtering for specfic record types, and as such were focused on.
 
-At this stage, we need to:
+**Commands we use:**
+_We managed to run/ran these commands in our makefile_
+1. `scan`
+2. `convertFormat` (optional command we provide for viewable `.json` output files that are stored in a folder titled `YoDNS_output/Output_<#>_DN/json`)
+3. `validate` _(optional command that allows us to check if YoDNS worked and see any errors that occured during resolution)_
+4. `stats` _(optional command that allows us to see every target DN resolved in a specific output file, ending with a total number of DNs resolved, total messages and optional tagged DN counts)_
+5. `extractMessages`: This command allowed us to filter YoDNS `json` output messages for specific `RCode` types and from only authoritative servers, which was our first step towards filtering the YoDNS output data for our specific goals.
 
-- learned the difference between YoDNS binary output and JSON output
-- learned how to use protobuf to process binary data
+_However, we did not feel like `extractMessages` was adequate, as large quantities of data we had no intention of using (Domain lists, Zonedata, and Message metadata) was still "clogging up" these large `.json` extracted output files. More importantly, there was no flag to specify only glue records; we could only extract every NS query message exchange. As a result, we looked into the underlying structure of the Go code for this command (located in `yodns/yodns/cmd/extractMessages.go` and a variety of other folders)..._
+
+#### 3.6.b. Learn about the YoDNS struct system and using it to create our own modified message filtering command
+Through tracing the `extractMessages.go` and `filters.go` files, we realized that numerous packages referencing files in other subfolders/directories, largely within the `yodns/resolver` directory, were imported and outline a complex system of structs that creates a somewhat object-oriented representation of the YoDNS scan components. The most important structs we identified for our purpose of filtering messages are mapped as follows:
+
+   _*Note: not all the instance variables of each struct are provided, only the ones useful to our project_
+
+```mermaid
+graph TD;
+A{package <b>model</b>} --> B([type <b>MessageExchange</b> <br> struct]);
+B ----> C([<b>OriginalQuestion</b>: <br><i>model.Question struct]);
+A ----> C;
+B ----> D[ResponseAddr: <br><i>string];
+B ----> E([<b>NameServerIP</b>:<br> <i>netip.Addr struct]);
+B ----> F([<b>Metadata</b>: <br> <i>model.Metadata struct]);
+A ----> F;
+B ----> G([<b>Message</b>:<br> <i>*model.Message struct]);
+A ----> G;
+B ----> H([<b>Error</b>: <br> <i>model.SendError struct]);
+A ----> H;
+I{package <b>netip</b>} ----> E;
+G ----> J[Id: <br> <i>uint16]
+G ----> K[RCode: <br> <i>int]
+G ----> L[Opcode: <br> <i>int]
+G ----> M[IsAuthoritative: <br> <i>bool]
+G ----> N(["`<b>Question</b>: <br><i> []ResourceRecord struct`"]);
+G ----> O(["`<b>Answer</b>: <br> <i> []ResourceRecord struct`"]);
+G ----> P(["`<b>Authority</b>: <br> <i>[]ResourceRecord struct`"]);
+G ----> Q(["`<b>Additional</b>: <br> <i>[]ResourceRecord struct`"]);
+G <----> R([type <b>*dns.Msg</b> <br> struct]);
+S([type <b>ResourceRecord</b> <br> struct]) ----> N;
+S ----> O;
+S ----> P;
+S ----> Q;
+A ----> S;
+T([type <b>dns.RR</b> <br> struct]) <----> S;
+U{package <b>dns</b>} ----> T;
+U ----> R;
+S ----> V[Name: <br> <i>string];
+S ----> W[Type: <br> <i>uint16];
+S ----> X[Class: <br> <i>uint16];
+S ----> Y[Value: <br> <i>string];
+S ----> Z[TTL: <br> <i>uint32];
+```
+Utilization of this struct/package hierarchy enabled us the trace the filtering `msgLoop` in `extractMessages.go`, create additional glue filters in `filters.go`, and modify a `ResourceRecord` struct helper function (along with a few other small tweaks) for the purpose of creating a revised filtering command (`extractMessagesCapstone`) that is currently used in the makefile within the `filter_results` target to:
+   - If the `--glue-only` flag is set to `true`, only the glue records (with flags to specify a DN, record type, or class of the glue record) will be extracted to a `.json.zst` file. We use this to extract `A` and `AAAA` glue records from NS queries. Relevant information (`File`: filename, `RespondingNS`: NS providing the glue records, `ProvidedWithAnswerTo`: the NS the glue record(s) are for, `GlueRecords`: the glue records) is presented in the following format:
+
+```
+{
+   "File": "YoDNS_output/Output_1_DN/data/output_00000000_cda549f0.pb.zst",
+   "RespondingNS": [
+         "a2.info.afilias-nst.info."
+   ],
+   "ProvidedWithAnswerTo": "info.afilias-nst.org.",
+   "GlueRecords": [
+      {
+               "Name": "b0.info.afilias-nst.org.",
+               "Type": 1,
+               "Class": 1,
+               "TTL": 86400,
+               "Value": "199.254.48.1"
+      }
+   ]
+}
+```
+   - If glue records are not being searched for (such as when we extract `A` and `AAAA` authoritative records), only this information (`File`, `RespondingNS`, `Answer`) is provided in the following format:
+
+```
+{
+   "File": "YoDNS_output/Output_1_DN/data/output_00000000_cda549f0.pb.zst",
+   "RespondingNS": [
+         "b0.info.afilias-nst.info."
+   ],
+   "Answer": [
+      {
+               "Name": "b0.info.afilias-nst.org.",
+               "Type": 1,
+               "Class": 1,
+               "TTL": 86400,
+               "Value": "199.254.48.1"
+      }
+   ]
+}
+```
+---
+### 3.7. Analyzed Filtered Authoritative and Glue `A` and `AAAA` Record Output for Stale Glue Records
+_Task leader: Emma_
+
+Now equipped with simple, filtered records, we learned how to parse through `.json` files in a python script (located at `/capstone-project/data_processing/process_glue.py`) with the following analysis pipeline:
+1. Unzip and iterate through every authoritative `json` object/record entry and create a dictionary mapping every encountered DN to a set containing its IP records aquired from authoritative nameservers.
+   - _Any `Message.Answer` entries not containing an `A` or `AAAA` record (example: `RRSIG` records that were not filtered out prior) are ignored._
+2. Unzip and iteracte through every glue record, creating a `{DN: {Ips}}` dictionary, while  also creating a glue record frequency count dictionary (`{IP: FreqCt}`) and keeping track of the total number of glue records.
+3. Compare the authoritative and glue dictionaries of the same format to determine if there are any IPs encountered in glue records that are not present in the authoritative record IP set for that DN (for shared DNs, `inconsistent = glue_IP_set - auth_IP_set`).
+4. Verify that these inconsistent glue records are stale by querying each NS with an inconsistent glue record for its own IP address (`A` or `AAAA` depending on the inconsistent record type) and determine if it provides its own IP. If not, as NSes are authoritative for their own IP records (they look into local zone data to provide the answer), the glue record is likely stale/outdated; that IP is no longer associated with that NS and could leave domains susceptible to attack if the NS domains are re-registered or the stale IPs are obtained [2].
+5. Calculate basic stale-glue statistics:
+   - The percentage of glue records encountered by YoDNS that are stale
+   - The number of unique IPs and NSes that have stale glue records
+  
+_While simple, this script seems to correctly identify stale glue records encountered during a YoDNS scan, thus fufilling our first objective._
+
+#### Batching strategies for large input datasets
+
+To expand our ability to detect stale glue records on a larger scale, our next step was to figure out how to scale up our program, or at least run it safely in increments. When beginning to test scaling strategies, we ran into the issues of creating so many output files that the cs.colgate server’s disk filled; through significant trial-and-error (and a LOT more file compression), we determined that adding the option for batching output files would be beneficial, as this enabled us to:
+Test large scale experiments/filtering/analysis on a smaller scale beforehand using a subset of its output files.
+To have time to analyze filtered output files and delete raw data before continuing with the experiment; filtering the entirety of the raw `.pb.zst` output files when they are in the thousands can overload the disk. 
+To eventually use batching to automate the scanning/processing of large input files in a way that is safer and does not result in significant loss and the need to redo filtering procedures if something fails/goes awry.
+
+While developing and testing batching for the Tranco 1M experiment, we developed two formats:
+Provide the option to specify a batch range so that we can utilize the original pipeline but run it multiple times, storing batched output files in numbered subfolders.
+Provide the alternative option to run a “batched” experiment wherein scan output folders are automatically moved into batched subfolders and analyzed in those batches.
+A merge_results python script that takes the statistics and inconsistent IP analysis output files for individual batches and merges them together to get representative statistics for the entire scan.
+This file is located in `capstone-project/data-processing/merge_files.py` and can be run using the `make merge_files` target in the `makefile`.
+
+_What we learned: challenges of batch processing_
+The organizational challenge of creating a batched pipeline was quite difficult to integrate with our existing pipeline and took significant research on `makefile` syntax. GenAI was used throughout this learning and debugging process, and (where appropriately cited) helped generate/modify specific code snippets in the makefile to help integrate batching functionality.
+
+A limitation of this newer analysis and merging code added to facilitate batching is that, in its current state, it is not the most versatile for analyzing anything other than stale glue records. Originally, it was the intention to make the analysis and merging scripts able to process any type of/range of DNS record types to aid in dangling CNAME identification, but we encountered difficulty with establishing this versatility under the project time constraints. Currently, batching functionality and merging of analysis output files only is applicable to the search for `A`  and `AAAA` stale glue records, but, if we were continuing this project further, we would extend this functionality to CNAME identification. 
+
+
+---
+### 3.8. Extracted Relevent Records for Dangling CNAME Identification
+_Task leader: Chenyun_
+Path: `YoDNS_output/Output_9295_DN/filtered/CNAME_REC`
+
+The information we needed from the raw YoDNS output was relatively simple: we only needed authoritative CNAME records. In DNS, CNAME records have rtype == 5, and authoritative answers are marked with the AA flag. Therefore, we used our modified extractMessagesCapstone command to filter the raw output and extract all messages where rtype == 5 and the response was authoritative. These filtered records then served as the input for our later analysis of potential dangling CNAMEs.
+
+
+---
+### 3.9. Analyzed Filtered Records to Identify Dangling CNAMEs
+_Task leader: Chenyun_
+Path: `data_processing/process_cname.py`
+
+We wrote a script that scans a directory of DNS response JSON files, reconstructs CNAME chains, detects dangling or misconfigured records, and saves the results to CSV files.
+
+
+#### Pipeline
+
+```
+JSON files (cname-dir/)
+        │
+        ▼
+ [Phase 1] Parse & Build CNAME Map
+  - Read all .json files in parallel (8 threads)
+  - For each DNS answer with Type=5 (CNAME), record name → value
+  - Detect misconfiguration: same name mapping to multiple different targets
+        │
+        ▼
+ [Phase 2] Follow CNAME Chains
+  - Identify chain start points (names that are never a CNAME target)
+  - Recursively follow each chain to its final endpoint
+  - Detect and short-circuit cycles
+        │
+        ▼
+ [Phase 3] Dig Endpoints (20 threads)
+  - For each start → endpoint pair, run `dig <endpoint>`
+  - Parse the status field: NOERROR, NXDOMAIN, SERVFAIL, TIMEOUT, etc.
+        │
+        ▼
+ [Phase 4] Save Results (output-dir/)
+  - all_results.csv     — every start domain with its endpoint and dig status
+  - dangling_cname.csv  — entries where dig returned NXDOMAIN/SERVFAIL/TIMEOUT/UNKNOWN
+  - misconfig.csv       — domains whose CNAME target was inconsistent across records
+```
+
+
+#### Dangling CNAME Detection
+
+A CNAME chain is considered **dangling** if the final endpoint resolves with a failure status (`NXDOMAIN`, `SERVFAIL`, `TIMEOUT`, or `UNKNOWN`). These are potential subdomain takeover risks.
+
+#### Misconfiguration Detection
+
+A domain is flagged as **misconfigured** if different DNS records map it to more than one CNAME target — indicating conflicting or stale records across nameservers.
+
+
+
+
+
+---
+## 4. Exact Procedure Replication
+_Instructions for precisely replicating a YoDNS experiment to identify stale glue records and dangling CNAMEs_
+
+In order to replicate a YoDNS scan and analysis for stale glue and dangling CNAME records, follow this procedure:
+
+### **In the `makefile`**: 
+(located directly in the `/capstone-project` directory)
+
+1. Change the "general", "filtering" and "scan" parameters to your desired output:
+   - Set `Num_DNs` to the number of domains in your scan `input.csv` file.
+   - Ensure the `configSubDir` is set to the one containing the `runconfig.json5` file you want to use for the configuration of your scan.
+   - Specify the name of your `input.csv` file and make sure it is placed in the same folder as your config file.
+   - Specify the `inputLen` (number of DNs to scan from your provided input list)
+   - Specify `parallelFiles` (the number of parallel files you want to be created and written to simultaneouslt during a scan; additional files will be created incrementally in blocks of this size if more are needed for larger inputs.
+   - Specify `fileSize` (the number of DN resolutions per output file)
+        - For example, if you are scanning 1,000,000 DNs with 250 parallel files and a file size of 1000, 250 output files will be created and filled a total of four consecutive times before the scan is complete.
+   - If you are not planning on placing your ourputs in batched subfolders, ensure the `Batch` variable assignment line is commented out (it defaults to an empty string in that case)
+      - If you would like to run just a single batch of data through, uncomment the `Batch` line and make sure to specify the output file numbers (ex 1-10 would be equivalent to batching the output files `output_00000001_*pb.zst`-`output_00000010_*pb.zst`
+   - While specified within the target `run_scan`, as this parameter was adequate for the server, the `--threads` flag can be used to set the max threads used for the scan.
+2. Comment/uncomment optional commands in `run_scan`: the lines running the `validate` and `convertFormat` commands.
+   - For larger scans, we advise against converting to `.json` format due to the large file sizes!
+3. Once parameters are set, either:
+   a) In the `capstone-project` directory, run the `make pipeline` command to run each element of the YoDNS capstone measurement in order.
+   b) Run each target in order (`make run_scan` --> `make filter_results` --> `make filter_results_CNAME` --> `make analyze_results` --> `make merge_results` if you were using batches) to verify successful completion of each target and ensure that (for larger scans) disk space is available.
+4. If instead you would like to run multi-batching (having a batched output that runs automatically):
+   a. Put your desired batch ranges into the `Batch_NOs` variable using the specified syntax.
+   b. Given the size of your input, the number of parallel files, and the file size specifications, ensure your scan will generate enough files for your specified batching ranges if the raw output files have not already been generated.
+   c. To run an entire batching scan, run `make pipeline_batching`. Note that this pipeline does not include `CNAME` identification or analysis currently, just stale glue.
+6. Where to locate results:
+
+   **run_scan Results:**
+   - `/YoDNS_output/Output_<#>_DN/data`: raw compressed binary `.pb.zst` output files
+   - `/YoDNS_output/Output_<#>_DN/validate`: validation output for each file, `.json.zst` format
+   -  `/YoDNS_output/Output_<#>_DN/stats`:stats output for each file, `.json.zst` format
+  
+   **filter_results Results:**
+   - `/YoDNS_output/Output_<#>_DN/filtered`: filtered records for authoritative `A` and `AAAA` records, glue records, and `CNAME` records in `.json.zst` format, all in appropriately named subfolders.
+  
+   **analyze_results Results:**
+   - `/YoDNS_output/Output_<#>_DN/results/stale_glue`:
+        - `Inconsistent_IPs-<#>.csv`: file containing every identified stale glue IP and its corresponding DN and record type.
+        - `Stale_Glue_Freq-<#>.csv`: file containing every identified stale glue IP and its frequency (how many times a glue record for that IP was encountered in the YoDNS scan).
+        - A `.txt` file (brief report) detailing the total frequency of stale glue records and numbers of unique DNs and IPs involved.
 
 ---
 
-## Current Results/Artifacts
+## 5.Current Results/Artifacts
 
-### 1. run_scan and filter_results makefile functions
-- Both present in the `makefile` within the main repository folder, in addition to earlier experiments, the makefile allows you to:
+### 1. run_scan, filter_results, and analyze_results makefile functions
+- All present in the `makefile` within the main repository folder. In addition to earlier experiments, the makefile allows you to:
      A) Run YoDNS scans on any example dataset and place results in any output folder, with options to run commands for scan validation and scan statistics to ensure scan success.
      B) Filter binary YoDNS output file messages for authoritatative A and AAAA records, along with all NS records.
+     C) Analyze the output data for stale glue records and dangling CNAMEs
 
 ### 2. Output files for scans of varying sizes
 - Present in subfolder the `YoDNS_output` folder, all raw YoDNS scan output is accessible in zipped binary (in `Output_#_DN/data`, `output_#.pb.zst` format) and json format (zipped or unzipped depending on file size, in `Output_#_DN/json`, `output_#.json.zst` or `output_#.json` format).
@@ -145,17 +406,191 @@ At this stage, we need to:
       A) Authoritative A record (Ipv4) answers.
       B) Authoritative AAAA record (Ipv6) answers.
       C) All NS record answers.
+
+### 3. Python scripts to process and analyze data
+   Path: `data_preprocess/prepare_subfinder_data.py`,`data_processing/process_cname.py`, `data_processing/process_glue.py`
+
+### 4. Final results from scanning 9295 candidates
+   Path: `YoDNS_output/Output_9295_DN/results`
+
+### 5. Final results from scanning the Tranco Top 1M list (glue records identified)
+   *Note: due to size issues (40GB of issues that GitHub wasn't very fond of, to be exact, the raw binary output files and logs were deleted but the scan can be redone easily via the makefile (time estimation: 1-2 hours).
+   Path: `YoDNS_output/Output_1000000_DN/results`
  
 ---
 
-## Next Steps
+## 6. Final Results Analysis
 
-Our next tasks are:
+### Dangling CNAMEs
 
-1. Continue improving the preprocessing pipeline and candidate quality, we still need more data.
-3. Learn how to process binary output
-2. Write code to automatically extract candidate domains with `NS` records from `Zonedata`.
-3. Parse `Messages` to identify referral responses and collect raw glue from `Additional` sections.
-4. Extend the pipeline later for bad or dangling CNAME analysis.
+From 9,295 subdomains, we extracted 2,605 unique CNAME chains. In these results, we found 9 possible misconfiguration cases and 1 dangling CNAME candidate. This number is very small, but it is reasonable because of how we built our dataset.
+
+During data preprocessing, we only kept candidates that returned a normal DNS result when tested with `dig`. We filtered out domains that returned errors such as `NXDOMAIN`, `SERVFAIL`, `TIMEOUT`, or other failure results.
+
+Because of this, the most obvious type of dangling CNAME was already removed before the final analysis. For example, suppose we have:
+
+```text
+A CNAME B
+```
+
+If `B` has been deleted, expired, or no longer has a valid DNS record, then running `dig A` will usually follow the CNAME chain to `B` and return `NXDOMAIN`. This kind of dangling CNAME is easy to detect with a normal `dig` query, so it would not remain in our final dataset.
+
+Instead, we are interested in a more hidden type of dangling CNAME. This type may not be detected by a simple `dig` query, but it may be found by a full-tree DNS lookup tool such as **YoDNS**.
+
+For example, consider this situation:
+
+```text
+NS_1 returns: A CNAME B
+NS_2 returns: A CNAME C
+```
+
+Here, two authoritative nameservers give different CNAME answers for the same domain. This is already a DNS inconsistency. Now suppose `C` has been removed, but the DNS record was not fully cleaned up.
+
+A normal `dig` query may only reach the nameserver that returns `B`, which still works correctly. In that case, everything looks normal. However, another nameserver may still return the broken path through `C`. This means the dangling CNAME problem is hidden and depends on which nameserver is queried.
+
+This is why YoDNS is useful for our project. It can query authoritative nameservers more completely and show different answers across the DNS tree. This helps us find problems that a normal `dig` query may miss.
 
 ---
+
+#### Analysis of Detected Misconfiguration Cases
+
+Among the 9 cases flagged by our script, most of them may not be real misconfigurations.
+
+Our script marks a domain as misconfigured when it sees the same domain pointing to different CNAME targets. However, this does not always mean the DNS configuration is wrong. In some cases, different CNAME answers are intentional.
+
+**1. Anycast / Traffic Management (False Positives)**
+
+Some domains are designed to return different answers to different users or resolvers. This is common for traffic management, load balancing, and geographic routing.
+
+Unlike a normal CNAME that always points to one fixed target, a traffic-managed domain may return different targets depending on location, server load, or routing policy. For example, users in different regions may be sent to different backend servers.
+
+In our results, `manage-pe.trafficmanager.net` returned different targets across `westus`, `eastus`, and `centralus`. This looks like normal geographic routing, where users are sent to nearby backend servers.
+
+Similarly, `production-v2-tm-dns.trafficmanager.net` returned both `app-01` and `app-02` in the `francecentral` region. This looks like a normal active-active redundancy setup, where multiple servers are used at the same time for reliability.
+
+The suffix `trafficmanager.net` is also a strong sign that these different answers are intentional. Therefore, these cases are likely false positives rather than real mistakes.
+
+**2. Infrastructure Migration (Ambiguous Cases)**
+
+Another reason for different CNAME answers is infrastructure migration.
+
+When an organization moves from one hosting setup to another, old and new DNS records may exist at the same time. For example, one nameserver may already have the new answer, while another nameserver may still return the old answer. This can happen during a transition period and may last from minutes to days depending on DNS TTL settings.
+
+For example, `cdn.awehunt.com` points to either an Alibaba OSS bucket:
+
+```text
+oss-cn-beijing.aliyuncs.com
+```
+
+or an Alibaba CDN endpoint:
+
+```text
+cdngslb.com
+```
+
+This looks like a migration from direct object-storage hosting to a CDN layer.
+
+These cases are ambiguous. They may still resolve correctly under normal conditions, so they may not be immediately dangerous. However, the inconsistency still creates a risk window. If the old target becomes invalid before the migration is fully completed, it could become a dangling CNAME that is harder to detect.
+
+**3. Likely Real Misconfiguration**
+
+The case that looks most like a real mistake is:
+
+```text
+www.solarmagazine.nl
+```
+
+It has two conflicting CNAME targets:
+
+```text
+solar-vps.slcloud.nl
+solarmagazine.nl
+```
+
+The first target, `solar-vps.slcloud.nl`, looks like a VPS host. The second target, `solarmagazine.nl`, is the apex domain.
+
+According to DNS standards, a zone apex should not be used as a CNAME in this way. The apex domain must contain important DNS records such as `SOA` and `NS`. These records are not compatible with treating the apex as a pure alias.
+
+Because of this, `www.solarmagazine.nl` may behave differently depending on the resolver. Some resolvers may return an error, while others may still try to follow the CNAME chain.
+
+---
+
+#### The Dangling CNAME Case
+
+The single confirmed dangling CNAME candidate is:
+
+```text
+seller-adcp-qa.magnite.com.
+    → internal-all-seller-adcp-2071761466.us-west-2.elb.amazonaws.com.
+    → NXDOMAIN
+```
+
+This means that `seller-adcp-qa.magnite.com` pointed to an AWS Elastic Load Balancer hostname that did not exist at the time of detection.
+
+This is a security risk because deleted cloud resources can sometimes become available again. If another AWS user could create a load balancer with the same name, they might be able to serve content under `seller-adcp-qa.magnite.com`, which is a real Magnite subdomain. They would not need to change Magnite's DNS records directly.
+
+This type of issue is called **subdomain takeover**.
+
+However, when we later re-ran `dig` on this endpoint, it returned `NOERROR`. This means Magnite likely restored or updated the record. Therefore, the problem appears to have been real but temporary. It also suggests that Magnite's infrastructure team may have noticed and fixed the issue.
+
+
+#### Limitations
+
+There are several limitations in our final analysis.
+
+First, the number of flagged CNAME misconfiguration cases and dangling cases is very small. We only found 9 possible misconfiguration cases and 1 dangling CNAME candidate. Because the sample size is limited, our results may not cover all possible types of CNAME-related problems. There may be other categories of misconfiguration that did not appear in our dataset.
+
+Second, even if we had a much larger number of misconfiguration cases, it would still be difficult to classify every conflicting CNAME case perfectly using only hardcoded rules. Different CNAME targets do not always mean there is a real mistake. They may be caused by normal traffic management, load balancing, geographic routing, infrastructure migration, or temporary DNS updates. Because of this, simple rule-based classification can easily produce false positives or miss more subtle cases.
+
+A possible direction for future work is to use machine learning or statistical classification methods to help categorize CNAME conflicts at scale. For example, a model could learn patterns from known cases of traffic management, migration, and real misconfiguration, and then assign confidence scores to new cases. This would make large-scale analysis more flexible than manually writing rules for every possible situation.
+
+Finally, DNS is highly dynamic. Records can change quickly because of TTL expiration, infrastructure updates, or cloud resource changes. A domain that appears dangling at one moment may be fixed later, and a domain that appears safe now may become dangling in the future. Therefore, our results should be understood as a snapshot of DNS behavior during the time of measurement, not a permanent conclusion.
+
+### Stale Glue Records
+
+#### Results from 9295 subdomains:
+
+While Zhang et al. [2024] was able to identify that a whopping 23.18% of glue records they analyzed were outdated, results of our YoDNS scan on 9295 subdomains found a significantly smaller proportion of verified stale glue records: 
+
+```
+1. Total stale A recs: 1661/340658 (0.48759%), 11/2899 unique stale IP(s) (0.37944%) from 12/3023 unique NS names (0.39696%).
+2. Total stale AAAA recs: 9/316157 (0.00285%), 1/2144 unique stale IP(s) (0.04664%) from 1/2239 unique NS names (0.04466%).
+```
+
+A mere 0.49% of `A` glue records, stemming from only 11 unique IPv4 addresses, was identified using YoDNS, and the proportion of `AAAA` glue records is even smaller. What can account for these differences?
+
+A key consideration is the fact that significantly different strategies were employed to discover glue records; by downloading the authorized zone files for 1,096 TLDS utilizing ICANN’s CZDS, Zhang et al. [2024], they were able to collect over 2.5M glue records containing information for 975,168 SLDs. Due to the inefficiency of our process to generate subdomains using Subfinder, identifying glue records for subdomains on such a large scale was not feasible for the scope of our project. 
+
+While our approaches differed significantly, we argue that each methodology provides a unique insight into the DNS hierarchy. The technique of Zhang et al. [2024] is more experimental/controlled in design, gathering glue zone files and carefully resolving each one and determining which GlueIPs still serve their delegated domains, providing absolute information on the prevalence of stale glue records within the DNS in its entirety. However, by utilizing YoDNS we take on a more naturalistic approach, modelling the probability of a recursive resolver encountering a stale glue record in some form during a resolution at one point in time. While most DNS measurement tools engaging in opportunistic traversal provide information on just the “choices” a resolver makes in its navigation throughout the DNS, YoDNS, in a certain capacity, gives us eyes inside the DNS, modelling every bit of data the measurement tool comes into contact with during a resolution. 
+
+Additionally, while Steurer et al. [2025] did not utilize YoDNS to measure stale glue records, they did apply the tool to the identification of inconsistent A records among authoritative name servers (replicating the methodology of Izechevich et al. [2022]), and found that YoDNS was able to identify significantly more A record inconsistencies in comparison to ZDNS, a standard measurement tool utilizing opportunistic traversal of the DNS tree. While more limited in its scope in comparison to Zhang et al. [2024], this result gives us hope that YoDNS is in fact an optimal measurement tool for identifying minute inconsistencies in the DNS infrastructure and has the potential to effectively allow us to quantify the magnitude of a threat stale glue records pose to DNS security.
+
+#### Results from the Tranco Top 1M:
+
+While lacking in subdomains, we decided to try to increase our output size by adjusting our experiment to analyze the Tranco Top 1M list of domains for stale glue record, to see if our stale glue prevalence identified by YoDNS would approach that of Zhang et al. [2024] when scaled up drastically. 
+
+_When the results of four batches of filtered output for 1M domains were combined (1000 target domains resolved per file, 250 files per batch, 4 batches total, individual batch results can be found in `capstone-project/YoDNS_output/Output_1000000_DN/results/indiv_results_stale_glue`), this is what we found:_
+
+```
+1. Total stale A recs: 1013751/218915337 (0.46308%), 1037 unique stale IP(s) (Avg: 0.62307%) from 1091 unique NS names (Avg: 0.50424%).
+2. Total stale AAAA recs: 20663283/208200294 (9.92471%), 82 unique stale IP(s) (Avg: 0.28324%) from 80 unique NS names (Avg: 0.22398%).
+```
+
+While scaled to a total of 200M glue records, the proportion of stale `A` glue records remained largely stable at 0.46%. However, the proportion of stale `AAAA` records increased to 9.92%. The precedent for `IPv6` stale glue prevalence is less established, as Zhang et al. [2024] limited their scope to `IPv4` addresses. What is most interesting about this finding is its variability between the four batches of 250,000 input domains run at a time. In two batched outputs (`Stale_Glue_Stats-1000000.txt` and `Stale_Glue_Stats-1000000_1.txt`), the percentage of stale `AAAA` records is low (<0.05%), but jumps to 19.91% and 19.94% in `Stale_Glue_Stats-1000000_2.txt` and `Stale_Glue_Stats-1000000_3.txt`, respectively. 
+
+_Why did this occur?_
+
+On closer inspection, the difference causing this jump in percentage is attributed to the frequency of stale IP glue records being recorded by YoDNS, not an increase in the proportion of unique stale IPs, which ranged between 0.4% and 0.8% by batch. After examining the stale IP frequency tables (`Stale_IP_Freq_1000000.csv`), we saw that YoDNS received a massive influx of glue records for a few specific `IPv6` addresses which bolstered the overall proportion of stale glue records. Upon cross-referencing with the stale DN table (`Inconsistent_IPs-1000000.csv`), it became evident that this is because they are all root server NSes, `*.root-servers.net`. At first, I attributed this to a failure in my analysis script, but did see numerous reports of errors trying to connect to root servers with these specific `IPv6` addresses; the WHOIS 2001:7fe::53 website even has a 201 error message in its raw output, stating that their IP was blocked for making too many requests. Why this is the case, why YoDNS did not find `AAAA` records for these root servers, and why it only occurred in specific batches of our 1M output is unknown and an interesting avenue for future analysis of our scan’s functionality, behavior, and that of the YoDNS measurement tool.
+
+---
+
+## References
+
+[1] Florian Steurer, Anja Feldmann, and Tobias Fiebig. 2025. A Tree in a Tree: Measuring Biases of Partial DNS Tree Exploration. In Passive and Active Measurement: 26th International Conference, PAM 2025, Virtual Event, March 10–12, 2025, Proceedings. Springer-Verlag, Berlin, Heidelberg, 106–136. https://doi.org/10.1007/978-3-031-85960-1_5
+
+[2] Yunyi Zhang, Baojun Liu, Haixin Duan, Min Zhang, Xiang Li, Fan Shi, Chengxi Xu, and Eihal Alowaishcq. 2024. Rethinking the security threats of stale DNS glue records. In Proceedings of the 33rd USENIX Conference on Security Symposium (SEC '24). USENIX Association, USA, Article 71, 1261–1277. https://www.usenix.org/system/files/usenixsecurity24-zhang-yunyi-rethinking.pdf
+
+[3] Liz Izhikevich, Gautam Akiwate, Briana Berger, Spencer Drakontaidis, Anna Ascheman, Paul Pearce, David Adrian, and Zakir Durumeric. 2022. ZDNS: a fast DNS toolkit for internet measurement. In Proceedings of the 22nd ACM Internet Measurement Conference (IMC '22). Association for Computing Machinery, New York, NY, USA, 33–43. https://doi.org/10.1145/3517745.3561434
+
+
+
