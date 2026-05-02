@@ -390,7 +390,7 @@ In order to replicate a YoDNS scan and analysis for stale glue and dangling CNAM
  
 ---
 
-## 6. Final Results Analysis (Outdated CNAME and Glue Records)
+## 6. Final Results Analysis
 
 ### Dangling CNAMEs
 
@@ -518,12 +518,6 @@ A possible direction for future work is to use machine learning or statistical c
 Finally, DNS is highly dynamic. Records can change quickly because of TTL expiration, infrastructure updates, or cloud resource changes. A domain that appears dangling at one moment may be fixed later, and a domain that appears safe now may become dangling in the future. Therefore, our results should be understood as a snapshot of DNS behavior during the time of measurement, not a permanent conclusion.
 
 
-
----
-
-### Stale Glue Records
-
-To be done.
 
 ---
 
