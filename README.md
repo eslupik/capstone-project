@@ -352,7 +352,7 @@ In order to replicate a YoDNS scan and analysis for stale glue and dangling CNAM
 ### **In the `makefile`**: 
 (located directly in the `/capstone-project` directory)
 
-1. Change the "general" and "scan" parameters to your desired output:
+1. Change the "general", "filtering" and "scan" parameters to your desired output:
    - Set `Num_DNs` to the number of domains in your scan `input.csv` file.
    - Ensure the `configSubDir` is set to the one containing the `runconfig.json5` file you want to use for the configuration of your scan.
    - Specify the name of your `input.csv` file and make sure it is placed in the same folder as your config file.
@@ -360,13 +360,19 @@ In order to replicate a YoDNS scan and analysis for stale glue and dangling CNAM
    - Specify `parallelFiles` (the number of parallel files you want to be created and written to simultaneouslt during a scan; additional files will be created incrementally in blocks of this size if more are needed for larger inputs.
    - Specify `fileSize` (the number of DN resolutions per output file)
         - For example, if you are scanning 1,000,000 DNs with 250 parallel files and a file size of 1000, 250 output files will be created and filled a total of four consecutive times before the scan is complete.
+   - If you are not planning on placing your ourputs in batched subfolders, ensure the `Batch` variable assignment line is commented out (it defaults to an empty string in that case)
+      - If you would like to run just a single batch of data through, uncomment the `Batch` line and make sure to specify the output file numbers (ex 1-10 would be equivalent to batching the output files `output_00000001_*pb.zst`-`output_00000010_*pb.zst`
    - While specified within the target `run_scan`, as this parameter was adequate for the server, the `--threads` flag can be used to set the max threads used for the scan.
 2. Comment/uncomment optional commands in `run_scan`: the lines running the `validate` and `convertFormat` commands.
    - For larger scans, we advise against converting to `.json` format due to the large file sizes!
 3. Once parameters are set, either:
    a) In the `capstone-project` directory, run the `make pipeline` command to run each element of the YoDNS capstone measurement in order.
-   b) Run each target in order (`make run_scan` --> `make filter_results` --> `make filter_results_CNAME` --> `make analyze_results`) to verify successful completion of each target and ensure that (for larger scans) disk space is available.
-4. Where to locate results:
+   b) Run each target in order (`make run_scan` --> `make filter_results` --> `make filter_results_CNAME` --> `make analyze_results` --> `make merge_results` if you were using batches) to verify successful completion of each target and ensure that (for larger scans) disk space is available.
+4. If instead you would like to run multi-batching (having a batched output that runs automatically):
+   a. Put your desired batch ranges into the `Batch_NOs` variable using the specified syntax.
+   b. Given the size of your input, the number of parallel files, and the file size specifications, ensure your scan will generate enough files for your specified batching ranges if the raw output files have not already been generated.
+   c. To run an entire batching scan, run `make pipeline_batching`. Note that this pipeline does not include `CNAME` identification or analysis currently, just stale glue.
+6. Where to locate results:
 
    **run_scan Results:**
    - `/YoDNS_output/Output_<#>_DN/data`: raw compressed binary `.pb.zst` output files
@@ -378,7 +384,8 @@ In order to replicate a YoDNS scan and analysis for stale glue and dangling CNAM
   
    **analyze_results Results:**
    - `/YoDNS_output/Output_<#>_DN/results/stale_glue`:
-        - A `.csv` file containing every identified stale glue IP and its corresponding DN and record type.
+        - `Inconsistent_IPs-<#>.csv`: file containing every identified stale glue IP and its corresponding DN and record type.
+        - `Stale_Glue_Freq-<#>.csv`: file containing every identified stale glue IP and its frequency (how many times a glue record for that IP was encountered in the YoDNS scan).
         - A `.txt` file (brief report) detailing the total frequency of stale glue records and numbers of unique DNs and IPs involved.
 
 ---
